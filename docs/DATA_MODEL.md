@@ -26,8 +26,6 @@ erDiagram
   ENTITIES ||--o| PROJECTS : project_projection
   PROJECTS ||--o{ PROJECT_STATE_HISTORY : transitions
   PROJECTS ||--o{ PROJECT_ITEMS : organizes
-  WORKSPACES ||--o{ MEMORIES : remembers
-  MEMORIES ||--o{ EMBEDDINGS : represented_by
 ```
 
 ## Core tables
@@ -49,7 +47,7 @@ All foreign keys use matching `workspace_id` through composite unique constraint
 | `entity_merge_candidates` | Candidate pair, feature scores JSON, confidence, resolution (`PENDING`, accepted, rejected), resolver/model/run | PK; unique ordered pair + resolver version; pending confidence index | Retained for audit/manual correction. Acceptance creates a merge record. |
 | `entity_merges` | Reversible canonical mapping: absorbed entity, survivor, decision source, reason, confidence, `merged_at`, `reversed_at` | PK; indexes absorbed/current and survivor | Never destructive. Reads resolve active mapping; reversal closes mapping and rebuilds projections. |
 | `assertions` | Typed extracted state: subject entity, predicate/type (`GOAL`, `DECISION`, `OPEN_QUESTION`, `FACT`, etc.), object entity or value JSON, status, confidence, observed/effective/valid times, extraction result | PK; indexes workspace/subject/type/current, GiST validity range, extraction result | Append-only claim. Close `valid_to`/status transactionally when contradicted/superseded; retain history. |
-| `evidence` | Provenance for assertion/relation/state/memory: target kind+ID, message, extraction run/result, quote start/end offsets, optional stored excerpt hash, confidence | PK; indexes target, message, run; FK source objects | Immutable. Prefer offsets into immutable message; excerpt is display convenience and integrity-checkable. At least one evidence row required before derived fact is published. |
+| `evidence` | Cross-cutting provenance for assertion/relation/state/retrieval output: target kind+ID, message, extraction run/result, quote start/end offsets, optional stored excerpt hash, confidence | PK; indexes target, message, run; FK source objects | Immutable. Prefer offsets into immutable message; excerpt is display convenience and integrity-checkable. At least one evidence row required before derived fact is published. |
 | `entity_relations` | Typed directed graph edge, source/target, confidence, derivation source, `valid_from`, `valid_to`, status | PK; indexes workspace/source/type/current and target/type/current; GiST time range; unique active edge fingerprint | Append/close, never overwrite. Self-edge/type checks. Evidence required. |
 
 ## Project projections
@@ -67,15 +65,18 @@ Separate `project_milestones`, `project_tasks`, etc. are not used initially: the
 
 The server returns counts, not an LLM score: `completed evidence-backed milestones / actionable evidence-backed milestones`. It also returns excluded counts (suggested, cancelled, no longer valid). If there are no accepted milestones, progress is `not_available`; task counts may be shown separately and never silently substituted.
 
-## Memory, retrieval, and operations
+## Memory projections, retrieval, and operations
+
+Semantic memory (current supported facts/entities), episodic memory (evidence-backed events), and project memory (project assertions and history) are initially read projections over source-of-truth messages, assertions, entities, relations, and project history. Phase 0 does not create a `memories` table. A persisted retrievable-unit table may be added in Phase 6 only if retrieval measurements show a concrete need; it must be rebuildable, point to provenance, and never become duplicate truth.
+
+The following operational tables are future vertical-slice schema, not part of the Phase 0 baseline:
 
 | Table | Purpose and columns | Indexes / lifecycle |
 |---|---|---|
-| `memories` | Materialized retrievable unit: memory type (`EPISODIC`, `SEMANTIC`, `PROJECT`), subject entity, assertion/event reference, canonical text, salience, valid times, status | workspace/type/current; subject/time; full-text GIN. Rebuildable, versioned/closed rather than overwritten. Working memory is request/session data and is not persisted here by default. |
-| `embeddings` | Polymorphic retrievable object kind/ID, embedding model/version, dimensions, content hash, `vector`, created time | unique object/model/version/hash; HNSW vector cosine index per supported dimension/model; workspace/object index | Immutable; stale versions retained briefly then safely garbage-collected because provenance points to source, not vector. |
-| `context_queries` | Optional privacy-aware audit: scope, normalized query hash (raw text opt-in), retrieval version, selected evidence IDs, usage/latency | workspace/time; no raw answer by default | Short retention/configurable deletion. |
-| `outbox_events` | Durable event envelope/payload/status/attempts | unique event ID; pending/available index | Delete/archive after retention; payload excludes message text. |
-| `background_jobs` | Durable idempotent work, payload, dedupe key, status, attempts, lease, next run, last sanitized error | unique type/dedupe key for active jobs; claim index status/next run | Retry with backoff; dead-letter retained for diagnosis. |
+| `embeddings` | Polymorphic retrievable source kind/ID, model/version, dimensions, content hash, vector, created time | Immutable cache; unique source/model/version/hash. Added in Phase 6. |
+| `context_queries` | Optional privacy-aware retrieval audit metadata | Short retention; no raw query/answer by default. Added with retrieval. |
+| `outbox_events` | Minimal durable event envelope and dispatch state | Added only when a concrete asynchronous vertical slice needs it. |
+| `background_jobs` | Minimal durable idempotent work record, attempts and sanitized error | Added with import/extraction work; leases/backoff only as demonstrated by that work. |
 
 ## Temporal semantics
 

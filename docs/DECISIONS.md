@@ -40,7 +40,7 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 
 ## ADR-010 — Durable database jobs plus transactional outbox
 
-**Status:** Accepted. **Decision:** expensive/retryable work uses a PostgreSQL job table; domain data and outbox event are committed together; Spring events dispatch in-process. **Why:** bare application events are not durable, while Kafka is unnecessary. **Consequences:** implement leases, idempotency, backoff, and cleanup. A broker can consume the outbox later.
+**Status:** Accepted. **Decision:** expensive/retryable work uses a PostgreSQL job table; domain data and outbox event are committed together; Spring events dispatch in-process. **Why:** bare application events are not durable, while Kafka is unnecessary. **Consequences:** add only the minimum polling, idempotency, retry, and cleanup behavior demonstrated by an import or extraction job. Phase 0 has no job/outbox schema. General schedulers, dashboards, DAGs, advanced priority queues, and speculative distributed infrastructure are rejected. A broker can consume the outbox later if measured need arises.
 
 ## ADR-011 — Unified assertions, dedicated project projection
 
@@ -48,7 +48,7 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 
 ## ADR-012 — Historical truth is append/close, current state is rebuildable
 
-**Status:** Accepted. **Decision:** temporal assertions/relations/state use half-open validity intervals and supersession links. Current project/memory views are projections. **Why:** newer context must not erase how thinking evolved. **Consequences:** late imports trigger ordered replay; projection handlers must be idempotent.
+**Status:** Accepted. **Decision:** temporal assertions/relations/state use half-open validity intervals and supersession links. Current project and memory views are projections. **Why:** newer context must not erase how thinking evolved. **Consequences:** late imports trigger ordered replay; projection handlers must be idempotent.
 
 ## ADR-013 — React Flow for the first graph UI
 
@@ -58,6 +58,18 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 
 **Status:** Accepted. **Decision:** separate structured generation, embeddings, and grounded answers instead of one broad `ModelProvider`. **Why:** providers/models have different capabilities and streaming/extraction failure semantics. **Consequences:** routing is per capability; vendor SDK types remain adapter-local.
 
+## ADR-015 — Memory starts as derived read projections
+
+**Status:** Accepted. **Decision:** semantic, episodic, and project memory initially derive from source messages, assertions, entities, relations, and append-only project history. Do not create a standalone `memory` implementation or `memories` table before Phase 6. **Why:** assertions and temporal history are already the evidence-backed truth; copying them creates reconciliation risk without a demonstrated retrieval need. **Consequences:** Ask My Context may later materialize versioned, rebuildable retrieval units after measurement, but those units must reference provenance and cannot become independent truth.
+
+## ADR-016 — Provenance is a small cross-cutting capability
+
+**Status:** Accepted. **Decision:** a `provenance` package owns stable evidence persistence and narrow read/write interfaces. It depends toward conversation/extraction sources; entity, graph, project, and retrieval consume its interfaces. **Why:** evidence supports more than canonical entities, including manual assertions, state transitions, and grounded answers. **Consequences:** keep the package small and the graph acyclic; do not grow it into a generalized workflow subsystem.
+
+## ADR-017 — Apache License 2.0
+
+**Status:** Accepted. **Decision:** license ContextMesh under the standard Apache License, Version 2.0. **Why:** it is OSI-approved, permissive, and includes explicit patent terms. **Consequences:** retain the root `LICENSE` and required notices when distributing the software; no custom license terms apply.
+
 ## Important unresolved decisions
 
 1. **Initial model provider/model policy:** evaluate structured-schema reliability, cost, privacy terms, rate limits, and embedding availability with a fixed corpus.
@@ -65,5 +77,4 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 3. **Raw archive retention:** delete staging immediately after normalization by default; confirm whether opt-in retention is worth privacy/storage complexity.
 4. **ChatGPT branch semantics:** decide how alternate branches appear as conversations/messages using real export fixtures.
 5. **Entity auto-merge thresholds:** require an evaluation corpus and precision-first target before enabling automatic merge.
-6. **Licensing:** select an OSI-approved license before substantive contributions.
-7. **Embedding model migration:** initially allow one configured dimension per deployment or support multiple model-specific columns/tables; decide after provider selection.
+6. **Embedding model migration:** initially allow one configured dimension per deployment or support multiple model-specific columns/tables; decide after provider selection.

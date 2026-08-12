@@ -104,6 +104,9 @@ If the October conversation is imported before August's, `observed_at` and effec
 
 ## Memory model
 
+These are retrieval views, not separate sources of truth. Initially they are computed from messages, assertions, entities, relations, and append-only project history. ContextMesh must not copy assertions into an independently authoritative memory store. Phase 6 may materialize rebuildable retrieval units only after Ask My Context demonstrates a concrete performance or ranking need; every unit must retain provenance to its source.
+
+
 ### Working memory
 
 Ephemeral context for the current UI query/conversation: user request, scope, selected entities, and recent turns. Kept in request/session storage with strict token limits; it is not automatically promoted.
@@ -120,7 +123,7 @@ Relatively stable facts and concepts: canonical entities, descriptions, aliases,
 
 A project-focused projection of goal, decisions, milestones, tasks, questions, state history, related topics, and recent conversations. It references assertions rather than copying truth.
 
-Messages supply evidence; entities supply identity; the graph supplies relationships; embeddings supply candidate similarity, not truth. Promotion from extraction into a memory requires validation and provenance. Reconciliation can close a memory's validity while retaining it episodically.
+Messages supply evidence; entities supply identity; the graph supplies relationships; embeddings supply candidate similarity, not truth. Inclusion in a memory view requires validation and provenance. Reconciliation closes underlying assertion or relation validity while history remains available to the episodic view.
 
 ## Retrieval and answering
 

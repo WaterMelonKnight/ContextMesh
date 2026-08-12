@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-contextmesh}
+      POSTGRES_USER: ${POSTGRES_USER:-contextmesh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contextmesh}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - contextmesh-postgres:/var/lib/postgresql/data
+
+volumes:
+  contextmesh-postgres:
+

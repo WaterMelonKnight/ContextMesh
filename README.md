@@ -1,61 +1,68 @@
 # ContextMesh
 
-ContextMesh is a planned open-source AI workspace that converts imported AI conversations into **evolving, evidence-backed state**. Instead of being another general chat client, it will reconstruct a user's topics, projects, goals, decisions, questions, tasks, milestones, and their changes over time.
+ContextMesh converts AI conversations into **evolving, evidence-backed state**. It is not a general chat client: the product goal is to reconstruct topics, projects, decisions, and changes while preserving the path back to original evidence.
 
-> **Status:** product specification and architecture only. No application is implemented yet, and the commands below describe the intended developer experience.
+> **Status — Phase 0:** the runnable development foundation is implemented. Product functionality such as importing conversations, extraction, graphs, projects, and Ask My Context remains planned and is not available yet.
 
-## Why it exists
+## Implemented now
 
-Useful context is fragmented across ChatGPT, Claude, Gemini, local models, and many sessions. Searchable transcripts do not answer what was decided, what changed, or why the system believes it. ContextMesh will normalize those transcripts, extract structured context, reconcile repeated concepts, and preserve links to the original messages.
+- Java 21 / Spring Boot 3 modular-monolith foundation with Maven Wrapper.
+- `GET /api/v1/health`, backed by a live database query.
+- PostgreSQL 16 with pgvector through Docker Compose.
+- Flyway baseline containing only users and workspaces.
+- Testcontainers database/migration smoke test and an ArchUnit cycle rule.
+- Next.js/React/TypeScript status page that calls the real health API.
+- Backend and frontend GitHub Actions checks.
 
-## MVP
+## Planned product
 
-The first release validates one pipeline:
+Future vertical slices will add conversation normalization/import, versioned structured extraction, conservative entity resolution, evidence-aware graph and project projections, temporal history, and grounded retrieval. None of those features is claimed as implemented in Phase 0. See the [roadmap](docs/ROADMAP.md).
 
-```text
-conversation imports -> structured extraction -> entity resolution
-  -> context graph -> project state and timeline -> retrieval with evidence
-```
+## Prerequisites
 
-It includes generic JSON and ChatGPT export import, a conversation browser, versioned LLM extraction, conservative entity resolution, project/topic views, timelines, provenance, and evidence-bearing “Ask My Context.” It deliberately excludes a general multi-model chat gateway, collaboration, billing, mobile apps, and distributed infrastructure.
+- Docker with Compose
+- Java 21 (the Maven distribution is downloaded by `mvnw`)
+- Node.js 20 and npm
 
-## Planned architecture
+## Run locally
 
-```text
-Browser -> Next.js/TypeScript web app -> Spring Boot 3/Java 21 modular monolith
-                                      -> PostgreSQL + pgvector
-                                      -> external model/embedding APIs (BYOK)
-```
-
-The backend is one deployable with directional domain modules. PostgreSQL stores transactional, temporal, graph-edge, full-text, and vector data. Database-backed jobs provide resumable background work; no Kafka or graph database is required. Maven is selected for its explicit, predictable lifecycle and widespread Spring tooling support—useful to a solo developer and coding agents.
-
-## Repository layout (planned)
-
-```text
-apps/web/             # Next.js application (created in Phase 0)
-services/server/      # Spring Boot modular monolith (created in Phase 0)
-docs/                 # Product and technical specifications
-```
-
-Shared packages will be added only when actual duplication justifies them.
-
-## Intended local development
-
-After Phase 0, developers will use Docker Compose for PostgreSQL/pgvector and run the two applications independently:
+From the repository root, start pgvector PostgreSQL:
 
 ```bash
 docker compose up -d postgres
-cd services/server && ./mvnw spring-boot:run
-cd apps/web && npm run dev
 ```
 
-These commands do not work yet because scaffolding is intentionally outside this specification task. Start with [the product specification](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), and [roadmap](docs/ROADMAP.md).
+Start the backend in a second terminal:
 
-## Guiding rule
+```bash
+cd services/server
+./mvnw spring-boot:run
+```
 
-**Convert conversations into evolving state, and make every important belief explainable from evidence.**
+Start the frontend in a third terminal:
 
-## Documentation
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000>. The web application calls the backend at `http://localhost:8080` by default. Override it before starting Next.js when needed:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run dev
+```
+
+Development database defaults are `contextmesh` for database, user, and password on port `5432`. Override Compose with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`; configure the server with `DATABASE_URL`, `DATABASE_USER`, and `DATABASE_PASSWORD`. These defaults are local-only and are not production secrets.
+
+## Checks
+
+```bash
+cd services/server && ./mvnw verify
+cd apps/web && npm install && npm run lint && npm run typecheck && npm run build
+```
+
+## Architecture and documentation
 
 - [Product](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -65,4 +72,6 @@ These commands do not work yet because scaffolding is intentionally outside this
 - [Roadmap](docs/ROADMAP.md)
 - [Architecture decisions](docs/DECISIONS.md)
 
-ContextMesh is intended to be open-source and self-hostable; a license and contribution policy will be selected before implementation begins.
+## License
+
+ContextMesh is licensed under the [Apache License 2.0](LICENSE).

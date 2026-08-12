@@ -1,0 +1,9 @@
+.idea/
+.vscode/
+*.iml
+services/server/target/
+apps/web/.next/
+apps/web/node_modules/
+apps/web/.env.local
+.DS_Store
+
