@@ -23,25 +23,38 @@ Each module contains `domain`, `application`, and `adapter` packages as needed. 
 
 ```mermaid
 flowchart TD
-  user --> conversation
-  user --> ingestion
+  user --> shared
+  conversation --> user
+  conversation --> shared
+  provider --> user
+  provider --> shared
+  ingestion --> user
   ingestion --> conversation
   ingestion --> provider
+  ingestion --> shared
   extraction --> conversation
   extraction --> provider
-  extraction --> entity
+  extraction --> shared
+  provenance --> conversation
+  provenance --> extraction
+  provenance --> shared
   entity --> conversation
+  entity --> provenance
+  entity --> shared
   graph --> entity
+  graph --> provenance
+  graph --> shared
   project --> entity
   project --> conversation
-  memory --> entity
-  memory --> conversation
-  retrieval --> memory
-  retrieval --> project
-  retrieval --> graph
+  project --> provenance
+  project --> shared
   retrieval --> conversation
+  retrieval --> entity
+  retrieval --> graph
+  retrieval --> project
+  retrieval --> provenance
   retrieval --> provider
-  shared -.technical primitives only.-> ingestion
+  retrieval --> shared
 ```
 
 Arrows mean “may depend on.” `graph` and `project` consume entity/extraction facts rather than calling each other. Retrieval composes their read APIs. Events must not create hidden circular command flows.
@@ -55,14 +68,16 @@ Arrows mean “may depend on.” `graph` and `project` consume entity/extraction
 | `conversation` | Provider-independent conversations/messages and source identity | `ConversationCatalog`, `MessageEvidenceReader` | `user`, `shared` | `ConversationStored` | workspace deletion |
 | `provider` | Model/embedding clients, routing, credentials, usage metadata; no domain truth | `StructuredGenerationPort`, `EmbeddingPort`, `AnswerGenerationPort` | `user`, `shared` | `ProviderCallRecorded` | — |
 | `extraction` | Runs, immutable results, schemas/prompts, chunking and validation | `ExtractionScheduler`, `ExtractionResultReader` | `conversation`, `provider`, `shared` | `ExtractionCompleted`, `EntityDetected`, typed assertion detection events | `ConversationNormalized` |
-| `entity` | Canonical entities, aliases, candidate matches, merge/reversal, assertions/evidence ownership | `EntityCatalog`, `ResolutionService`, `AssertionReader` | `conversation`, `shared` | `EntityMerged`, `EntitySplit`, `TopicDetected`, `ProjectDetected`, `DecisionDetected` | extraction detection events |
-| `graph` | Temporal typed entity relations and graph read projection | `GraphQuery`, `RelationWriter` | `entity`, `shared` | `GraphUpdated` | entity/merge/assertion events |
-| `project` | Project goal/state history, milestone/task/decision/question projections and explainable progress | `ProjectQuery`, `ProjectStateReconciler` | `entity`, `conversation`, `shared` | `ProjectStateChanged`, `ProjectProjectionUpdated` | project/assertion/merge events |
-| `memory` | Typed memory items, lifecycle, salience and embeddings | `MemoryCatalog`, `MemorySearch` | `entity`, `conversation`, `provider`, `shared` | `MemoryUpserted`, `EmbeddingRequested` | extraction/entity/project events |
-| `retrieval` | Query planning, hybrid candidates, ranking, evidence packet, grounded answer | `ContextQueryService`, `SearchService` | read interfaces of conversation/entity/graph/project/memory; provider | `ContextQueryAnswered` (audit metadata only) | — |
+| `provenance` | Cross-cutting evidence records and validation; extraction-backed and manual provenance | `EvidenceWriter`, `EvidenceReader` | `conversation`, `extraction`, `shared` | — | — |
+| `entity` | Canonical entities, aliases, candidate matches, merge/reversal, assertions | `EntityCatalog`, `ResolutionService`, `AssertionReader` | `conversation`, `provenance`, `shared` | `EntityMerged`, `EntitySplit`, `TopicDetected`, `ProjectDetected`, `DecisionDetected` | extraction detection events |
+| `graph` | Temporal typed entity relations and graph read projection | `GraphQuery`, `RelationWriter` | `entity`, `provenance`, `shared` | `GraphUpdated` | entity/merge/assertion events |
+| `project` | Project goal/state history, milestone/task/decision/question projections and explainable progress | `ProjectQuery`, `ProjectStateReconciler` | `entity`, `conversation`, `provenance`, `shared` | `ProjectStateChanged`, `ProjectProjectionUpdated` | project/assertion/merge events |
+| `retrieval` | Query planning, hybrid candidates, ranking, evidence packet, grounded answer; composes derived memory views | `ContextQueryService`, `SearchService` | read interfaces of conversation/entity/graph/project/provenance; `provider`, `shared` | `ContextQueryAnswered` (audit metadata only) | — |
 | `shared` | IDs, clock, pagination, domain-event/outbox primitives, errors; no business entities | small technical types | — | — | — |
 
-`topics` and `projects` are typed canonical entities but projects additionally have a dedicated state projection. Evidence is owned with assertions in `entity` to avoid a cyclic “provenance module”; all modules use its evidence-writing contract.
+`topics` and `projects` are typed canonical entities but projects additionally have a dedicated state projection. Evidence is a cross-cutting capability in the small `provenance` package: it persists stable links near extraction and exposes narrow application interfaces to entity, graph, project, and retrieval. It is not owned by canonical entities, because manual assertions, project transitions, and grounded answers also need provenance. The dependencies above keep that package acyclic.
+
+Semantic, episodic, and project memory initially are derived read projections over messages, assertions, entities, relations, and project history. There is no implemented `memory` module or duplicate memory truth in the MVP foundation. Phase 6 may introduce persisted retrieval units only when measured Ask My Context requirements justify them; such units remain rebuildable and reference their sources.
 
 ## Processing pipelines
 
@@ -86,6 +101,8 @@ sequenceDiagram
 ```
 
 ### Jobs and transactions
+
+The following is the target direction for the import/extraction vertical slices, not a Phase 0 scheduler deliverable. Phase 0 creates neither jobs nor outbox tables because no durable background work exists yet. Add their minimal schema and polling behavior with the first concrete job. Do not build a generalized distributed scheduler, dashboards, dependency DAGs, advanced priorities, or speculative worker infrastructure.
 
 - API writes domain data and an `outbox_events` row in one transaction.
 - A polling dispatcher claims rows with `FOR UPDATE SKIP LOCKED`, publishes Spring application events after commit, and marks dispatch status.

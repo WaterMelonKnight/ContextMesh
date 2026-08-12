@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+MVNW_VERSION=3.9.10
+BASE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+MAVEN_HOME="$BASE_DIR/.mvn/apache-maven-$MVNW_VERSION"
+if [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  mkdir -p "$BASE_DIR/.mvn"
+  ARCHIVE="$BASE_DIR/.mvn/apache-maven-$MVNW_VERSION-bin.tar.gz"
+  curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MVNW_VERSION/apache-maven-$MVNW_VERSION-bin.tar.gz" -o "$ARCHIVE"
+  tar -xzf "$ARCHIVE" -C "$BASE_DIR/.mvn"
+  rm "$ARCHIVE"
+fi
+exec "$MAVEN_HOME/bin/mvn" "$@"
+

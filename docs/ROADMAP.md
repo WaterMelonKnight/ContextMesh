@@ -8,7 +8,7 @@ Each phase is a deployable vertical slice. Tasks are deliberately narrow enough 
 
 **Deliverables:** Maven Java 21/Spring Boot service, Next.js TypeScript app, Compose PostgreSQL/pgvector, Flyway baseline, health endpoints, CI format/test/build, workspace/request skeleton, secret/logging policy.
 
-**Dependencies:** Java/Node/Docker versions and license decision.
+**Dependencies:** Java/Node/Docker versions. Apache-2.0 is selected in ADR-017.
 
 **Acceptance:** documented one-command infrastructure start; server and web smoke tests pass; migration applies to empty DB; CI builds both; no product feature claims.
 
@@ -101,10 +101,10 @@ Each phase is a deployable vertical slice. Tasks are deliberately narrow enough 
 ## First five assignments
 
 1. Scaffold `services/server` with Java 21, Spring Boot 3, Maven wrapper, module package boundaries, ArchUnit dependency test, and smoke test.
-2. Add Docker Compose PostgreSQL/pgvector plus Flyway baseline for users/workspaces/imports/conversations/messages/jobs/outbox and Testcontainers migration test.
+2. Add Docker Compose PostgreSQL/pgvector plus a deliberately small Flyway baseline for users/workspaces and a Testcontainers migration test. Add later tables only with their vertical slices.
 3. Specify generic conversation JSON v1 with JSON Schema and representative valid/invalid fixtures; implement only parser-to-domain contract tests.
 4. Implement idempotent conversation normalization/persistence application service with workspace-isolation integration tests.
-5. Scaffold `apps/web` and implement import-status/conversation-list API client pages against a documented stub contract (no fake production backend).
+5. Scaffold `apps/web` and implement a real health-status page; defer all import and conversation pages.
 
 Assignments 3 and 5 may proceed after API/domain contracts stabilize; assignments touching shared migrations should remain sequential to minimize conflicts.
 

@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: ContextMesh
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/contextmesh}
+    username: ${DATABASE_USER:contextmesh}
+    password: ${DATABASE_PASSWORD:contextmesh}
+  flyway:
+    locations: classpath:db/migration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+

@@ -4,6 +4,8 @@
 
 Base path is `/api/v1`. JSON uses camelCase and ISO-8601 UTC timestamps. IDs are opaque strings. Collection endpoints use cursor pagination (`items`, `nextCursor`) and bounded `limit` (default 25, max 100). Errors use RFC 9457 Problem Details with stable `type`, `title`, `status`, `detail`, `instance`, and optional `errors`/`correlationId`.
 
+Phase 0 implements only `GET /api/v1/health`, returning non-sensitive application and database status. Every product endpoint below is a planned contract for its corresponding future vertical slice, not currently implemented behavior.
+
 Authentication is same-site secure session cookie for the initial web app; unsafe requests require CSRF protection. The authenticated workspace is selected through `/workspaces/{id}` in authorization context or a validated `X-Workspace-Id`; clients can never submit ownership fields in bodies. All endpoints enforce workspace isolation.
 
 Long work returns `202 Accepted` with a resource URL. `Idempotency-Key` is required for imports and context queries that may be retried. Optimistic `ETag`/`If-Match` is used for future manual resolution.
