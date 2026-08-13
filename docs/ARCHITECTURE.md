@@ -91,6 +91,19 @@ A future native conversation separates **Conversation**, **Message**, and **Gene
 
 ## Processing pipelines
 
+The first synchronous import slice follows this provider-neutral boundary:
+
+```text
+Source-specific representation
+        -> ConversationImporter (parse + validate + normalize)
+        -> NormalizedConversation
+        -> ConversationImportService (ordered batch + summary)
+        -> ConversationIngestionService (identity + fingerprint + idempotency + conflict + per-conversation transaction)
+        -> PostgreSQL (conversation and message storage)
+```
+
+Importers have no persistence dependency and do not reproduce ingestion rules. Generic JSON is the first adapter; future provider exports, browser extraction, and third-party exporter connectors implement the same normalization seam. Dynamic loading and plugin infrastructure are deliberately outside this boundary.
+
 ```mermaid
 sequenceDiagram
   participant I as Ingestion worker

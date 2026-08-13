@@ -4,10 +4,15 @@
   "title": "ContextMesh Generic Conversation JSON v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "conversation"],
+  "required": ["schemaVersion"],
+  "oneOf": [
+    { "required": ["conversation"] },
+    { "required": ["conversations"] }
+  ],
   "properties": {
     "schemaVersion": { "const": "1" },
-    "conversation": { "$ref": "#/$defs/conversation" }
+    "conversation": { "$ref": "#/$defs/conversation" },
+    "conversations": { "type": "array", "items": { "$ref": "#/$defs/conversation" } }
   },
   "$defs": {
     "nonBlank": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
