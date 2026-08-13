@@ -4,7 +4,7 @@
 
 AI conversations are fragmented by provider and session. Transcripts preserve words but not durable state: the same project has several names, decisions are superseded, tasks become complete, and questions remain unresolved. Users cannot reliably ask what they decided, how their thinking changed, or which message supports a claim.
 
-ContextMesh imports those conversations and reconstructs an evolving, temporal, evidence-backed context model.
+ContextMesh reconstructs an evolving, temporal, evidence-backed context model from conversations and, later, observed AI-agent activity. Conversation import remains the first implementation slice; ContextMesh is not an agent orchestrator.
 
 ## Users and positioning
 
@@ -27,7 +27,8 @@ ContextMesh is an AI context reconstruction workspace, not a chat-provider repla
 - **Project:** an effort the user is trying to accomplish, with a goal and state.
 - **Entity:** a canonical concept (including topic/project/person/technology) with aliases.
 - **Assertion:** an extracted claim such as a goal, decision, question, task, milestone, or fact.
-- **Evidence:** an immutable pointer to source message content/span and extraction run.
+- **Context source:** an origin of observed context, initially an imported or native conversation and later potentially an agent run or external event.
+- **Evidence:** an immutable pointer to the source content or event and the derivation run.
 - **Current state:** a projection from still-valid, evidence-backed historical assertions—not a replacement for them.
 
 ## User stories

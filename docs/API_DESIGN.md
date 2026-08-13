@@ -4,7 +4,7 @@
 
 Base path is `/api/v1`. JSON uses camelCase and ISO-8601 UTC timestamps. IDs are opaque strings. Collection endpoints use cursor pagination (`items`, `nextCursor`) and bounded `limit` (default 25, max 100). Errors use RFC 9457 Problem Details with stable `type`, `title`, `status`, `detail`, `instance`, and optional `errors`/`correlationId`.
 
-Phase 0 implements only `GET /api/v1/health`, returning non-sensitive application and database status. Every product endpoint below is a planned contract for its corresponding future vertical slice, not currently implemented behavior.
+Phase 0 implements only `GET /api/v1/health`, returning non-sensitive application and database status. It returns `200 OK` whenever the backend can answer: `status: UP`/`database: UP` when the database query succeeds, or `status: DEGRADED`/`database: DOWN` when it does not. This liveness-oriented choice lets the frontend distinguish an unavailable backend from an unavailable database; no exception or connection detail is returned. Every product endpoint below is a planned contract for its corresponding future vertical slice, not currently implemented behavior.
 
 Authentication is same-site secure session cookie for the initial web app; unsafe requests require CSRF protection. The authenticated workspace is selected through `/workspaces/{id}` in authorization context or a validated `X-Workspace-Id`; clients can never submit ownership fields in bodies. All endpoints enforce workspace isolation.
 

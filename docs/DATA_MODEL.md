@@ -28,6 +28,12 @@ erDiagram
   PROJECTS ||--o{ PROJECT_ITEMS : organizes
 ```
 
+## Context-source evolution (conceptual)
+
+The planned conversation tables are the first concrete context source, not a universal container for every future input. A later agent-ingestion slice may introduce agent runs, steps, tool calls/results, artifacts, and parent-run relationships alongside conversations. Phase 0 deliberately adds neither a polymorphic `context_sources` table nor agent columns: the concrete access patterns and source formats must come first.
+
+Native multi-model conversations should evolve toward `Conversation -> Message -> Generation`. Provider/model execution metadata belongs primarily to `Generation`; imported source-provider metadata may remain on `Conversation`. This avoids a one-conversation/one-model constraint without changing the Phase 1 normalized import contract prematurely.
+
 ## Core tables
 
 All foreign keys use matching `workspace_id` through composite unique constraints where feasible, preventing accidental cross-tenant references. Default deletion is restrictive; the workspace deletion service performs ordered hard deletion.
@@ -91,7 +97,7 @@ Three times must not be conflated:
 ## Provenance invariants
 
 1. Every published assertion, entity relation, and state transition has evidence.
-2. Evidence identifies workspace, conversation/message, provider (via conversation), source timestamp, and extraction run/result.
+2. Initially, evidence identifies workspace, conversation/message, source provider/timestamp, and extraction run/result. Future evidence can identify an agent run/step, tool call/result, or artifact and the exact source event/content that supports the belief.
 3. Derived projection rows identify their causative assertion/relation/event.
 4. Entity merging rewrites no source evidence; canonical resolution occurs at read/projection time.
 5. Manual statements create a distinct `MANUAL` provenance record and never masquerade as imported text.
