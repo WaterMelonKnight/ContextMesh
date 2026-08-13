@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "HUMAN",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ]
+      }
+    ]
+  }
+}

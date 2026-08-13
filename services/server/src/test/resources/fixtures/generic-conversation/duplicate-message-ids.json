@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "same",
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ]
+      },
+      {
+        "externalId": "same",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "duplicate"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ]
+      },
+      {
+        "externalId": "m2",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hi"
+          }
+        ]
+      }
+    ],
+    "externalId": "c1",
+    "title": "Greeting",
+    "sourceProvider": "example",
+    "createdAt": "2026-01-01T10:00:00Z",
+    "updatedAt": "2026-01-01T10:01:00Z",
+    "metadata": {
+      "language": "en"
+    }
+  }
+}
