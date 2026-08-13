@@ -16,6 +16,10 @@ Long work returns `202 Accepted` with a resource URL. `Idempotency-Key` is requi
 
 Synchronously accepts the documented Generic Conversation JSON v1 single or batch envelope. The workspace path parameter is the explicit isolation boundary. The response is an ordered summary with `totalReceived`, `importedCount`, `skippedDuplicateCount`, `conflictCount`, and per-conversation ingestion results. Duplicate and conflict statuses are successful business results; invalid schema or malformed JSON returns HTTP 400 Problem Details. Each conversation is ingested in its own transaction.
 
+### `POST /api/v1/workspaces/{workspaceId}/imports/chatgpt`
+
+Synchronously accepts the top-level JSON array from an official ChatGPT export `conversations.json`. The provider adapter selects one deterministic canonical mapping branch and delegates normalized conversations to the same import and ingestion services as the generic endpoint. Response and duplicate/conflict semantics are identical. Invalid mapping relationships, roles, timestamps, or unsupported non-text content return HTTP 400 Problem Details. See [ChatGPT official export import](CHATGPT_EXPORT_IMPORT.md).
+
 ### `POST /api/v1/imports`
 
 Multipart fields: `file` and optional `adapter` (`auto`, `generic-json-v1`, `chatgpt-export`). Validates compressed/uncompressed limits and streams to staging.

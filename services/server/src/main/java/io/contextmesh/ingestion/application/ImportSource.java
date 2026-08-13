@@ -2,5 +2,6 @@ package io.contextmesh.ingestion.application;
 
 /** Stable identifiers for supported source representations. */
 public enum ImportSource {
-    GENERIC_JSON
+    GENERIC_JSON,
+    CHATGPT_OFFICIAL_EXPORT
 }
