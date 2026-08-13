@@ -34,7 +34,7 @@
         "role": { "enum": ["SYSTEM", "USER", "ASSISTANT", "TOOL"] },
         "createdAt": { "type": "string", "format": "date-time" }, "parentExternalId": { "$ref": "#/$defs/nonBlank" },
         "content": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/textPart" } },
-        "generation": { "anyOf": [{ "$ref": "#/$defs/generation" }, { "type": "null" }] },
+        "generation": { "$ref": "#/$defs/generation" },
         "metadata": { "$ref": "#/$defs/metadata" }
       }
     },

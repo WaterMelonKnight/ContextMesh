@@ -42,7 +42,7 @@ The version is the string `"1"`. Timestamps are ISO-8601 instants (an offset or 
 
 ## Fields
 
-All fields not marked required are optional and may be omitted or `null`. Present identifiers, titles, provider names, and model names cannot be blank.
+All fields not marked required are optional and may be omitted. If an optional field is present, it must contain a valid, non-null value; explicit JSON `null` is rejected. Present identifiers, titles, provider names, and model names cannot be blank.
 
 - The envelope requires `schemaVersion` and `conversation`.
 - A conversation requires `sourceType` (`IMPORTED_CONVERSATION` or `NATIVE_CONVERSATION`) and an ordered `messages` array. It may have `externalId`, `title`, `sourceProvider`, `createdAt`, `updatedAt`, and `metadata`.

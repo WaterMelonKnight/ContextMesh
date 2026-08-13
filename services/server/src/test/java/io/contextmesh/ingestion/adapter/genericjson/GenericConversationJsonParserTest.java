@@ -68,6 +68,35 @@ class GenericConversationJsonParserTest {
                 .hasMessage("$.conversation: metadata exceeds 50 entries");
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "externalId, '$.conversation.externalId: must not be null'",
+        "title, '$.conversation.title: must not be null'",
+        "sourceProvider, '$.conversation.sourceProvider: must not be null'",
+        "createdAt, '$.conversation.createdAt: must not be null'",
+        "updatedAt, '$.conversation.updatedAt: must not be null'",
+        "metadata, '$.conversation.metadata: must not be null'"
+    })
+    void rejectsExplicitNullConversationOptionalFields(String field, String message) {
+        String json = "{\"schemaVersion\":\"1\",\"conversation\":{\"sourceType\":\"IMPORTED_CONVERSATION\",\"messages\":[],\""
+                + field + "\":null}}";
+        assertThatThrownBy(() -> parser.parse(json)).hasMessage(message);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "externalId, '$.conversation.messages[0].externalId: must not be null'",
+        "createdAt, '$.conversation.messages[0].createdAt: must not be null'",
+        "parentExternalId, '$.conversation.messages[0].parentExternalId: must not be null'",
+        "metadata, '$.conversation.messages[0].metadata: must not be null'",
+        "generation, '$.conversation.messages[0].generation: must not be null'"
+    })
+    void rejectsExplicitNullMessageOptionalFields(String field, String message) {
+        String json = "{\"schemaVersion\":\"1\",\"conversation\":{\"sourceType\":\"IMPORTED_CONVERSATION\",\"messages\":[{\"role\":\"USER\",\"content\":[{\"type\":\"TEXT\",\"text\":\"Hello\"}],\""
+                + field + "\":null}]}}";
+        assertThatThrownBy(() -> parser.parse(json)).hasMessage(message);
+    }
+
     private String text(io.contextmesh.conversation.domain.NormalizedConversation c) { return ((TextContentPart)c.messages().getFirst().content().getFirst()).text(); }
     private io.contextmesh.conversation.domain.NormalizedConversation parse(String name) {
         try (var in = getClass().getResourceAsStream("/fixtures/generic-conversation/" + name)) {

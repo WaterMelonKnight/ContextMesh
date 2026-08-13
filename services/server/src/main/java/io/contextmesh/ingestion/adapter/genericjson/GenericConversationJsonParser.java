@@ -70,13 +70,15 @@ public final class GenericConversationJsonParser {
     }
 
     private GenerationMetadata generation(JsonNode node, String path) {
-        if (node == null || node.isNull()) return null;
+        if (node == null) return null;
+        if (node.isNull()) throw error(path, "must not be null");
         object(node, path, Set.of("provider", "model"));
         return new GenerationMetadata(requiredText(node, "provider", path + ".provider"), requiredText(node, "model", path + ".model"));
     }
     private Map<String,Object> metadata(JsonNode parent, String field, String path) {
         JsonNode node = parent.get(field);
-        if (node == null || node.isNull()) return Map.of();
+        if (node == null) return Map.of();
+        if (node.isNull()) throw error(path, "must not be null");
         if (!node.isObject()) throw error(path, "must be an object");
         @SuppressWarnings("unchecked") Map<String,Object> value = mapper.convertValue(node, LinkedHashMap.class);
         return value;
@@ -107,7 +109,8 @@ public final class GenericConversationJsonParser {
     }
     private static String optionalText(JsonNode parent, String field, String path) {
         JsonNode value = parent.get(field);
-        if (value == null || value.isNull()) return null;
+        if (value == null) return null;
+        if (value.isNull()) throw error(path, "must not be null");
         if (!value.isTextual()) throw error(path, "must be a string");
         if (value.textValue().isBlank()) throw error(path, "must not be blank");
         return value.textValue();
