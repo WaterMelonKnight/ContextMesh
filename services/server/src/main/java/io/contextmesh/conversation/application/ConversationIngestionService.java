@@ -5,6 +5,7 @@ import io.contextmesh.conversation.domain.NormalizedConversation;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ public class ConversationIngestionService {
     private final ConversationFingerprint fingerprint;
     private final Clock clock;
 
+    @Autowired
     public ConversationIngestionService(ConversationPersistencePort persistence, ObjectMapper objectMapper) {
         this(persistence, objectMapper, Clock.systemUTC());
     }
