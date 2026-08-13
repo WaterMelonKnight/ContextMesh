@@ -87,7 +87,7 @@ Conversation remains a first-class, simple domain concept. Future agent historie
 
 Multi-agent sources may preserve parent/child execution relationships and distinct agent identities while contributing evidence to the same workspace graph and project projections. ContextMesh observes these records; orchestration, autonomous agents, and a multi-agent framework remain outside the MVP. No agent persistence or module is introduced until an agent-ingestion vertical slice demonstrates the needed boundary.
 
-A future native conversation separates **Conversation**, **Message**, and **Generation**. A conversation is not permanently bound to one model: provider/model, finish reason, usage, and provider request identity belong primarily to a generation, allowing different or parallel model responses to one user message. Imported conversations may retain source-provider metadata. Persistence is deferred until the native-conversation slice.
+A future native conversation separates **Conversation**, **Message**, and **Generation**. A conversation is not permanently bound to one model: provider/model, finish reason, usage, and provider request identity belong primarily to a generation, allowing different or parallel model responses to one user message. Imported conversations retain source-provider and per-message generation metadata in the initial normalized persistence model; dedicated generation records remain deferred until the native-conversation slice.
 
 ## Processing pipelines
 
