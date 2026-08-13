@@ -14,16 +14,16 @@ erDiagram
   WORKSPACES ||--o{ IMPORTS : has
   WORKSPACES ||--o{ CONVERSATIONS : contains
   CONVERSATIONS ||--o{ MESSAGES : contains
-  CONVERSATIONS ||--o{ EXTRACTION_RUNS : processed_by
+  CONVERSATIONS ||--o{ EXTRACTION_RUNS : processedBy
   EXTRACTION_RUNS ||--o{ EXTRACTION_RESULTS : yields
   WORKSPACES ||--o{ ENTITIES : identifies
-  ENTITIES ||--o{ ENTITY_ALIASES : named_by
-  ENTITIES ||--o{ ASSERTIONS : subject_of
-  ASSERTIONS ||--o{ EVIDENCE : supported_by
-  MESSAGES ||--o{ EVIDENCE : source
-  ENTITIES ||--o{ ENTITY_RELATIONS : source
-  ENTITIES ||--o{ ENTITY_RELATIONS : target
-  ENTITIES ||--o| PROJECTS : project_projection
+  ENTITIES ||--o{ ENTITY_ALIASES : namedBy
+  ENTITIES ||--o{ ASSERTIONS : subjectOf
+  ASSERTIONS ||--o{ EVIDENCE : supportedBy
+  MESSAGES ||--o{ EVIDENCE : provides
+  ENTITIES ||--o{ ENTITY_RELATIONS : relationSource
+  ENTITIES ||--o{ ENTITY_RELATIONS : relationTarget
+  ENTITIES ||--o| PROJECTS : projectedAs
   PROJECTS ||--o{ PROJECT_STATE_HISTORY : transitions
   PROJECTS ||--o{ PROJECT_ITEMS : organizes
 ```
