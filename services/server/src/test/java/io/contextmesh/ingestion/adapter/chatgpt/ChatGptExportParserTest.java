@@ -26,9 +26,13 @@ class ChatGptExportParserTest {
                 .containsExactly("system-message", "user-message", "answer-message");
         assertThat(first.messages()).extracting(message -> message.role())
                 .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
+        assertThat(first.messages()).extracting(message -> message.parentExternalId())
+                .containsExactly(null, "system-message", "user-message");
         assertThat(first.messages().get(1).content()).extracting(part -> ((TextContentPart) part).text())
                 .containsExactly("你好，世界 🌍\n", "```java\nSystem.out.println(\"hi\");\n```");
-        assertThat(first.messages().get(2).parentExternalId()).isEqualTo("user-1");
+        assertThat(first.messages().get(2).metadata())
+                .containsEntry("sourceMappingNodeId", "assistant-current")
+                .containsEntry("sourceParentMappingNodeId", "user-1");
         assertThat(first.messages().get(2).generation().provider()).isEqualTo("openai");
         assertThat(first.messages().get(2).generation().model()).isEqualTo("gpt-4o");
         assertThat(first.metadata()).containsEntry("currentNode", "assistant-current")
@@ -39,6 +43,18 @@ class ChatGptExportParserTest {
     void choosesDeepestThenLexicallyGreatestLeafWithoutCurrentNode() {
         var second = parser.parse(fixture()).get(1);
         assertThat(second.messages()).extracting(this::text).containsExactly("Question", "Deterministic branch Z");
+    }
+
+    @Test
+    void skipsEmptySystemNullMessageAndKnownInternalNodesWhenLinkingNormalizedParents() {
+        var messages = parser.parse(fixture("empty-system-and-internal.json")).getFirst().messages();
+        assertThat(messages).extracting(message -> message.externalId())
+                .containsExactly("user-message", "assistant-message");
+        assertThat(messages).extracting(message -> message.parentExternalId())
+                .containsExactly(null, "user-message");
+        assertThat(messages.get(1).metadata())
+                .containsEntry("sourceMappingNodeId", "assistant-node")
+                .containsEntry("sourceParentMappingNodeId", "execution-node");
     }
 
     @Test void rejectsMalformedParentWithLocation() {
@@ -66,6 +82,10 @@ class ChatGptExportParserTest {
         assertFailure(oneMessage("user", "multimodal_text", "[\"x\"]"), "unsupported content type 'multimodal_text'");
         assertFailure(oneMessage("user", "text", "[{\"asset_pointer\":\"file://x\"}]"),
                 "conversation[0].mapping[\"n\"].message.content.parts[0]: must be text");
+        assertFailure(oneMessage("user", "text", "[\"\"]"),
+                "conversation[0].mapping[\"n\"].message.content.parts: must contain non-empty text for user message");
+        assertFailure(oneMessage("assistant", "text", "[\"\"]"),
+                "conversation[0].mapping[\"n\"].message.content.parts: must contain non-empty text for assistant message");
         assertFailure(oneMessage("user", "text", "[\"x\"]").replace("\"author\"", "\"create_time\":\"today\",\"author\""),
                 "conversation[0].mapping[\"n\"].message.create_time: must be Unix epoch seconds");
     }
@@ -82,8 +102,9 @@ class ChatGptExportParserTest {
         return export(mapping("\"n\":{\"parent\":null,\"children\":[],\"message\":{\"author\":{\"role\":\""
                 + role + "\"},\"content\":{\"content_type\":\"" + type + "\",\"parts\":" + parts + "}}}"));
     }
-    private String fixture() {
-        try (var input = getClass().getResourceAsStream("/fixtures/chatgpt-export/conversations.json")) {
+    private String fixture() { return fixture("conversations.json"); }
+    private String fixture(String name) {
+        try (var input = getClass().getResourceAsStream("/fixtures/chatgpt-export/" + name)) {
             if (input == null) throw new IllegalStateException("fixture missing");
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException exception) { throw new IllegalStateException(exception); }

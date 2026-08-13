@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Parser for the conversations.json file included in a user-requested ChatGPT data export. */
 public final class ChatGptExportParser {
@@ -29,6 +30,8 @@ public final class ChatGptExportParser {
     private static final int MAX_CONVERSATIONS = 1_000;
     private static final int MAX_NODES = 10_000;
     private static final int MAX_TEXT_CHARACTERS = 1_000_000;
+    private static final Set<String> INTERNAL_CONTENT_TYPES = Set.of(
+            "user_editable_context", "execution_output");
     private final ObjectMapper mapper;
 
     public ChatGptExportParser(ObjectMapper mapper) { this.mapper = Objects.requireNonNull(mapper); }
@@ -66,7 +69,15 @@ public final class ChatGptExportParser {
             throw error(path + ".current_node", "references missing mapping entry '" + endpoint + "'");
         List<Node> branch = endpoint == null ? List.of() : ancestorChain(endpoint, nodes, path);
         var messages = new ArrayList<NormalizedMessage>();
-        for (Node node : branch) if (node.message() != null) messages.add(message(node, path));
+        String parentExternalId = null;
+        for (Node node : branch) {
+            if (node.message() == null) continue;
+            NormalizedMessage message = message(node, parentExternalId, path);
+            if (message != null) {
+                messages.add(message);
+                parentExternalId = message.externalId();
+            }
+        }
 
         var metadata = new LinkedHashMap<String, Object>();
         metadata.put("sourceFormat", "chatgpt-official-export");
@@ -146,7 +157,7 @@ public final class ChatGptExportParser {
                         .thenComparing(Node::id)).orElseThrow().id();
     }
 
-    private NormalizedMessage message(Node node, String conversationPath) {
+    private NormalizedMessage message(Node node, String parentExternalId, String conversationPath) {
         String path = conversationPath + ".mapping[\"" + node.id() + "\"].message";
         JsonNode source = node.message();
         if (!source.isObject()) throw error(path, "must be an object");
@@ -156,6 +167,7 @@ public final class ChatGptExportParser {
         JsonNode content = required(source, "content", path + ".content");
         if (!content.isObject()) throw error(path + ".content", "must be an object");
         String contentType = requiredText(content, "content_type", path + ".content.content_type");
+        if (INTERNAL_CONTENT_TYPES.contains(contentType)) return null;
         if (!"text".equals(contentType))
             throw error(path + ".content.content_type", "unsupported content type '" + contentType + "'; only text is supported");
         JsonNode partsNode = required(content, "parts", path + ".content.parts");
@@ -165,19 +177,30 @@ public final class ChatGptExportParser {
         for (int i = 0; i < partsNode.size(); i++) {
             JsonNode part = partsNode.get(i);
             if (!part.isTextual()) throw error(path + ".content.parts[" + i + "]", "must be text");
-            if (part.textValue().isEmpty()) throw error(path + ".content.parts[" + i + "]", "must not be empty");
             totalCharacters += part.textValue().length();
             if (totalCharacters > MAX_TEXT_CHARACTERS) throw error(path + ".content.parts", "exceeds 1000000 characters");
-            parts.add(new TextContentPart(part.textValue()));
+            if (!part.textValue().isEmpty()) parts.add(new TextContentPart(part.textValue()));
+        }
+        if (parts.isEmpty()) {
+            if (role == MessageRole.SYSTEM) return null;
+            throw error(path + ".content.parts", "must contain non-empty text for " + role.name().toLowerCase() + " message");
         }
         String messageId = optionalText(source, "id", path + ".id");
         if (messageId == null) messageId = node.id();
         GenerationMetadata generation = generation(role, source.get("metadata"), path + ".metadata");
         try {
             return new NormalizedMessage(messageId, role, parts,
-                    timestamp(source.get("create_time"), path + ".create_time"), node.parent(), generation,
-                    Map.of("sourceContentType", contentType, "mappingNodeId", node.id()));
+                    timestamp(source.get("create_time"), path + ".create_time"), parentExternalId, generation,
+                    sourceMetadata(contentType, node));
         } catch (IllegalArgumentException exception) { throw error(path, exception.getMessage()); }
+    }
+
+    private static Map<String, Object> sourceMetadata(String contentType, Node node) {
+        var metadata = new LinkedHashMap<String, Object>();
+        metadata.put("sourceContentType", contentType);
+        metadata.put("sourceMappingNodeId", node.id());
+        if (node.parent() != null) metadata.put("sourceParentMappingNodeId", node.parent());
+        return metadata;
     }
 
     private GenerationMetadata generation(MessageRole role, JsonNode metadata, String path) {

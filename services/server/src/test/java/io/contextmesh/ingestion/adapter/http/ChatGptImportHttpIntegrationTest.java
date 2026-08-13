@@ -62,6 +62,9 @@ class ChatGptImportHttpIntegrationTest {
         assertThat(jdbc.queryForList("select external_id from messages where workspace_id = ? and conversation_id = "
                 + "(select id from conversations where workspace_id = ? and external_id = 'chatgpt-conversation-1') order by sequence_no",
                 String.class, workspaceId, workspaceId)).containsExactly("system-message", "user-message", "answer-message");
+        assertThat(jdbc.queryForList("select parent_external_id from messages where workspace_id = ? and conversation_id = "
+                        + "(select id from conversations where workspace_id = ? and external_id = 'chatgpt-conversation-1') order by sequence_no",
+                String.class, workspaceId, workspaceId)).containsExactly(null, "system-message", "user-message");
         assertThat(jdbc.queryForObject("select generation_model from messages where workspace_id = ? and external_id = 'answer-message'", String.class, workspaceId)).isEqualTo("gpt-4o");
     }
 

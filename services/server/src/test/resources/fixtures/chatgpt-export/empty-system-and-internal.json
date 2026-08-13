@@ -1,0 +1,15 @@
+[
+  {
+    "id": "chatgpt-empty-system",
+    "current_node": "assistant-node",
+    "mapping": {
+      "root": {"parent": null, "children": ["empty-system"], "message": null},
+      "empty-system": {"parent": "root", "children": ["internal-context"], "message": {"id": "empty-system-message", "author": {"role": "system"}, "content": {"content_type": "text", "parts": [""]}}},
+      "internal-context": {"parent": "empty-system", "children": ["user-node"], "message": {"id": "internal-message", "author": {"role": "system"}, "content": {"content_type": "user_editable_context", "parts": [{"not": "normalized"}]}}},
+      "user-node": {"parent": "internal-context", "children": ["null-node"], "message": {"id": "user-message", "author": {"role": "user"}, "content": {"content_type": "text", "parts": ["Hello"]}}},
+      "null-node": {"parent": "user-node", "children": ["execution-node"], "message": null},
+      "execution-node": {"parent": "null-node", "children": ["assistant-node"], "message": {"id": "execution-message", "author": {"role": "tool"}, "content": {"content_type": "execution_output", "parts": [{"arbitrary": "provider payload"}]}}},
+      "assistant-node": {"parent": "execution-node", "children": [], "message": {"id": "assistant-message", "author": {"role": "assistant"}, "content": {"content_type": "text", "parts": ["Hi"]}, "metadata": {"model_slug": "gpt-4o"}}}
+    }
+  }
+]
