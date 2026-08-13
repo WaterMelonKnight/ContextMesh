@@ -1,6 +1,8 @@
 package io.contextmesh.shared.health;
 
 import java.util.Map;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -16,8 +18,16 @@ final class HealthController {
     }
 
     @GetMapping("/api/v1/health")
-    Map<String, String> health() {
-        jdbcTemplate.queryForObject("select 1", Integer.class);
-        return Map.of("status", "UP", "application", "ContextMesh", "database", "UP");
+    ResponseEntity<Map<String, String>> health() {
+        try {
+            jdbcTemplate.queryForObject("select 1", Integer.class);
+            return ResponseEntity.ok(status("UP", "UP"));
+        } catch (DataAccessException ignored) {
+            return ResponseEntity.ok(status("DEGRADED", "DOWN"));
+        }
+    }
+
+    private Map<String, String> status(String status, String database) {
+        return Map.of("status", status, "application", "ContextMesh", "database", database);
     }
 }

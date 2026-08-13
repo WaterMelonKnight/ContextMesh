@@ -14,6 +14,10 @@ Each phase is a deployable vertical slice. Tasks are deliberately narrow enough 
 
 **Likely coding-agent tasks:** scaffold server with Maven wrapper; add Compose and DB health; add first Flyway migration; scaffold web with one status page; add CI workflows and developer commands.
 
+## Recommended next PR
+
+Implement **Generic Conversation JSON v1 + Normalized Conversation contract** only. Keep the contract compatible with future native multi-model conversations and sibling agent context sources, but do not implement agent support, provider generations, persistence, or import workers in that PR.
+
 ## Phase 1 — Conversation import and browser
 
 **Goal:** safely import and inspect normalized source material.

@@ -79,6 +79,16 @@ Arrows mean “may depend on.” `graph` and `project` consume entity/extraction
 
 Semantic, episodic, and project memory initially are derived read projections over messages, assertions, entities, relations, and project history. There is no implemented `memory` module or duplicate memory truth in the MVP foundation. Phase 6 may introduce persisted retrieval units only when measured Ask My Context requirements justify them; such units remain rebuildable and reference their sources.
 
+## Context sources and future execution histories
+
+A **Context Source** is the conceptual origin of material ContextMesh can understand. It is not a Phase 0 Java interface or database table. Initial source kinds are `IMPORTED_CONVERSATION` and, later, `NATIVE_CONVERSATION`; evolution may add `AGENT_RUN`, `MULTI_AGENT_RUN`, and `EXTERNAL_EVENT`. This boundary prevents extraction, provenance, and projections from permanently assuming all evidence is a chat message while avoiding a generic event framework before concrete formats exist.
+
+Conversation remains a first-class, simple domain concept. Future agent histories form a sibling model: `Context Source -> Conversation | Agent Run`. Candidate execution primitives include `AgentRun`, `AgentStep`, `ToolCall`, `ToolResult`, `Plan`, `Subtask`, `Artifact`, `Agent`, and parent/child runs. Runs, steps, tool activity, and plans are primarily source/event records; stable artifacts can also become meaningful entities; all may anchor provenance. Extracted goals, decisions, tasks, and facts remain assertions. Verified completion and artifact/status events may feed project timelines and deterministic state reconciliation.
+
+Multi-agent sources may preserve parent/child execution relationships and distinct agent identities while contributing evidence to the same workspace graph and project projections. ContextMesh observes these records; orchestration, autonomous agents, and a multi-agent framework remain outside the MVP. No agent persistence or module is introduced until an agent-ingestion vertical slice demonstrates the needed boundary.
+
+A future native conversation separates **Conversation**, **Message**, and **Generation**. A conversation is not permanently bound to one model: provider/model, finish reason, usage, and provider request identity belong primarily to a generation, allowing different or parallel model responses to one user message. Imported conversations may retain source-provider metadata. Persistence is deferred until the native-conversation slice.
+
 ## Processing pipelines
 
 ```mermaid

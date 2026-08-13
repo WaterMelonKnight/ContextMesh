@@ -1,18 +1,20 @@
 # ContextMesh
 
-ContextMesh converts AI conversations into **evolving, evidence-backed state**. It is not a general chat client: the product goal is to reconstruct topics, projects, decisions, and changes while preserving the path back to original evidence.
+ContextMesh converts AI conversations and future agent activity into **evolving, evidence-backed state**. It is not a general chat client: the product goal is to reconstruct topics, projects, decisions, and changes while preserving the path back to original evidence.
 
 > **Status — Phase 0:** the runnable development foundation is implemented. Product functionality such as importing conversations, extraction, graphs, projects, and Ask My Context remains planned and is not available yet.
 
 ## Implemented now
 
 - Java 21 / Spring Boot 3 modular-monolith foundation with Maven Wrapper.
-- `GET /api/v1/health`, backed by a live database query.
+- `GET /api/v1/health`, reporting application liveness and database availability without exposing diagnostics.
 - PostgreSQL 16 with pgvector through Docker Compose.
 - Flyway baseline containing only users and workspaces.
 - Testcontainers database/migration smoke test and an ArchUnit cycle rule.
 - Next.js/React/TypeScript status page that calls the real health API.
 - Backend and frontend GitHub Actions checks.
+
+The health endpoint deliberately returns HTTP `200 OK` when the process is alive, including when its payload is `DEGRADED` with `database: DOWN`. This keeps it usable as a liveness check and lets clients distinguish a reachable backend from a database outage. Readiness-sensitive deployment checks should inspect the payload (or use a future dedicated readiness endpoint).
 
 ## Planned product
 
@@ -22,7 +24,7 @@ Future vertical slices will add conversation normalization/import, versioned str
 
 - Docker with Compose
 - Java 21 (the Maven distribution is downloaded by `mvnw`)
-- Node.js 20 and npm
+- Node.js 22 LTS and npm (also recorded in `.nvmrc`)
 
 ## Run locally
 
@@ -43,7 +45,7 @@ Start the frontend in a third terminal:
 
 ```bash
 cd apps/web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -59,7 +61,7 @@ Development database defaults are `contextmesh` for database, user, and password
 
 ```bash
 cd services/server && ./mvnw verify
-cd apps/web && npm install && npm run lint && npm run typecheck && npm run build
+cd apps/web && npm ci && npm run lint && npm run typecheck && npm run build && npm audit
 ```
 
 ## Architecture and documentation

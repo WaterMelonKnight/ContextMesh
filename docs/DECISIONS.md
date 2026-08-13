@@ -70,6 +70,10 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 
 **Status:** Accepted. **Decision:** license ContextMesh under the standard Apache License, Version 2.0. **Why:** it is OSI-approved, permissive, and includes explicit patent terms. **Consequences:** retain the root `LICENSE` and required notices when distributing the software; no custom license terms apply.
 
+## ADR-018 — Context sources include conversations and future agent runs
+
+**Status:** Accepted. **Decision:** treat `Context Source` as a conceptual boundary whose first-class children include Conversation and, in a future slice, Agent Run. Preserve raw execution records as evidence/timeline detail and graph only meaningful concepts. Model native multi-provider output at a future Generation layer rather than binding Conversation to one model. **Why:** conversation import should stay simple without blocking agent histories, multi-agent parent/child runs, artifacts, or multi-model native conversations. **Consequences:** add no generic source table, agent module, Generation persistence, or orchestration now. Extend provenance through concrete source-specific references when an implemented slice proves their shape; every derived claim must still resolve to original source content/event.
+
 ## Important unresolved decisions
 
 1. **Initial model provider/model policy:** evaluate structured-schema reliability, cost, privacy terms, rate limits, and embedding availability with a fixed corpus.

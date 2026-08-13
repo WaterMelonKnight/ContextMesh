@@ -2,7 +2,7 @@
 
 ## Product principle
 
-**Convert conversations into evolving state.** ContextMesh is not primarily a transcript archive or general chat client. Preserve the path from every important derived claim to original evidence.
+**Convert conversations and future agent activity into evolving state.** ContextMesh is not primarily a transcript archive or general chat client. Preserve the path from every important derived claim to original evidence.
 
 ## Engineering principles
 

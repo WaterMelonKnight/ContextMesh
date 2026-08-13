@@ -11,6 +11,14 @@ conversation → extraction → entity resolution → temporal reconciliation
 
 Its key invariants are: source messages stay immutable; probabilistic output is versioned; uncertain identity is not destructively merged; history is append/close; important state requires evidence; current state can be rebuilt; and an LLM never computes project completion.
 
+## Source-neutral invariant
+
+The pipeline begins with a context source. Conversations are the first supported source; future agent runs can supply ordered execution events without being forced into fake messages. Every important derived state must identify the original source event or source content that caused ContextMesh to believe it. The provenance storage can evolve from message foreign keys to validated source-specific references when the first agent slice supplies concrete requirements; Phase 0 does not introduce premature polymorphic persistence.
+
+Agent steps and tool calls normally remain provenance and timeline detail, not graph nodes. The user-facing graph models meaningful concepts—projects, topics, technologies, decisions, tasks, artifacts, goals, organizations, and repositories. An artifact or execution event becomes a graph entity only when it is itself meaningful to user queries, not merely because it occurred.
+
+Agent evidence can strengthen project reconciliation: repository changes, test results, created artifacts, pull-request state, and CI status are more verifiable than an agent self-report. Future rules may turn those observations into evidence-backed task/milestone events, but must not automatically trust every report or invent progress percentages. Progress remains deterministic and explains its supporting records.
+
 ## 1. Normalize conversations
 
 An import adapter maps provider-specific records into `NormalizedConversation` and ordered `NormalizedMessage` values. It preserves source IDs, provider timestamps, roles, reply parents, and unknown safe metadata. Canonical content hashing normalizes only representation details (for example line endings), not meaningful text. `(workspace, provider, external ID)` and hashes make retries idempotent.
