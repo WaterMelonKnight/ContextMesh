@@ -16,11 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-final class JdbcConversationPersistenceAdapter implements ConversationPersistencePort {
+public class JdbcConversationPersistenceAdapter implements ConversationPersistencePort {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    JdbcConversationPersistenceAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+    public JdbcConversationPersistenceAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
     }
