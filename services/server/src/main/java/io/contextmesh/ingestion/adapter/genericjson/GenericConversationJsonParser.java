@@ -18,34 +18,50 @@ public final class GenericConversationJsonParser {
     public GenericConversationJsonParser(ObjectMapper mapper) { this.mapper = Objects.requireNonNull(mapper); }
 
     public NormalizedConversation parse(String json) {
+        var conversations = parseAll(json);
+        if (conversations.size() != 1) throw error("$.conversations", "must contain exactly one conversation for this operation");
+        return conversations.getFirst();
+    }
+
+    public List<NormalizedConversation> parseAll(String json) {
         if (json == null) throw error("$", "input is required");
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_INPUT_BYTES)
             throw error("$", "input exceeds 5 MiB");
         final JsonNode root;
         try { root = mapper.readTree(json); }
         catch (JsonProcessingException e) { throw new GenericConversationJsonException("$: malformed JSON: " + e.getOriginalMessage(), e); }
-        object(root, "$", Set.of("schemaVersion", "conversation"));
+        object(root, "$", Set.of("schemaVersion", "conversation", "conversations"));
         String version = requiredText(root, "schemaVersion", "$.schemaVersion");
         if (!SCHEMA_VERSION.equals(version)) throw error("$.schemaVersion", "unsupported version '" + version + "'; supported version is '1'");
-        JsonNode conversation = required(root, "conversation", "$.conversation");
-        object(conversation, "$.conversation", Set.of("externalId", "title", "sourceType", "sourceProvider", "createdAt", "updatedAt", "messages", "metadata"));
-        try {
-            var messagesNode = required(conversation, "messages", "$.conversation.messages");
-            if (!messagesNode.isArray()) throw error("$.conversation.messages", "must be an array");
-            var messages = new ArrayList<NormalizedMessage>();
-            for (int i = 0; i < messagesNode.size(); i++) messages.add(message(messagesNode.get(i), i));
-            return new NormalizedConversation(optionalText(conversation, "externalId", "$.conversation.externalId"),
-                    optionalText(conversation, "title", "$.conversation.title"),
-                    enumValue(requiredText(conversation, "sourceType", "$.conversation.sourceType"), ConversationSourceType.class, "$.conversation.sourceType"),
-                    optionalText(conversation, "sourceProvider", "$.conversation.sourceProvider"),
-                    instant(conversation, "createdAt", "$.conversation.createdAt"), instant(conversation, "updatedAt", "$.conversation.updatedAt"),
-                    messages, metadata(conversation, "metadata", "$.conversation.metadata"));
-        } catch (GenericConversationJsonException e) { throw e; }
-        catch (IllegalArgumentException e) { throw error("$.conversation", e.getMessage()); }
+        boolean single = root.has("conversation"), batch = root.has("conversations");
+        if (single == batch) throw error("$", "exactly one of conversation or conversations is required");
+        if (single) return List.of(conversation(required(root, "conversation", "$.conversation"), "$.conversation"));
+        JsonNode nodes = required(root, "conversations", "$.conversations");
+        if (!nodes.isArray()) throw error("$.conversations", "must be an array");
+        var result = new ArrayList<NormalizedConversation>(nodes.size());
+        for (int i = 0; i < nodes.size(); i++) result.add(conversation(nodes.get(i), "$.conversations[" + i + "]"));
+        return List.copyOf(result);
     }
 
-    private NormalizedMessage message(JsonNode node, int index) {
-        String path = "$.conversation.messages[" + index + "]";
+    private NormalizedConversation conversation(JsonNode conversation, String path) {
+        object(conversation, path, Set.of("externalId", "title", "sourceType", "sourceProvider", "createdAt", "updatedAt", "messages", "metadata"));
+        try {
+            var messagesNode = required(conversation, "messages", path + ".messages");
+            if (!messagesNode.isArray()) throw error(path + ".messages", "must be an array");
+            var messages = new ArrayList<NormalizedMessage>();
+            for (int i = 0; i < messagesNode.size(); i++) messages.add(message(messagesNode.get(i), i, path));
+            return new NormalizedConversation(optionalText(conversation, "externalId", path + ".externalId"),
+                    optionalText(conversation, "title", path + ".title"),
+                    enumValue(requiredText(conversation, "sourceType", path + ".sourceType"), ConversationSourceType.class, path + ".sourceType"),
+                    optionalText(conversation, "sourceProvider", path + ".sourceProvider"),
+                    instant(conversation, "createdAt", path + ".createdAt"), instant(conversation, "updatedAt", path + ".updatedAt"),
+                    messages, metadata(conversation, "metadata", path + ".metadata"));
+        } catch (GenericConversationJsonException e) { throw e; }
+        catch (IllegalArgumentException e) { throw error(path, e.getMessage()); }
+    }
+
+    private NormalizedMessage message(JsonNode node, int index, String conversationPath) {
+        String path = conversationPath + ".messages[" + index + "]";
         object(node, path, Set.of("externalId", "role", "createdAt", "parentExternalId", "content", "generation", "metadata"));
         JsonNode content = required(node, "content", path + ".content");
         if (!content.isArray()) throw error(path + ".content", "must be an array");

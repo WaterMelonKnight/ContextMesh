@@ -8,11 +8,18 @@ Optimize for one AI-assisted developer, rapid vertical slices, low cost, privacy
 
 ```mermaid
 flowchart LR
-  U[Browser] --> W[Next.js web]
-  W -->|REST/JSON| S[Spring Boot modular monolith]
-  S --> P[(PostgreSQL + pgvector)]
-  S -->|minimal required content| L[External model APIs]
-  S --> O[Object/file staging\nlocal volume initially]
+  BROWSER["Browser"]
+  WEB["Next.js web application"]
+  SERVER["Spring Boot modular monolith"]
+  DATABASE[("PostgreSQL with pgvector")]
+  MODELS["External model APIs"]
+  STORAGE["Object and file staging"]
+
+  BROWSER --> WEB
+  WEB -->|"REST API"| SERVER
+  SERVER --> DATABASE
+  SERVER -->|"Minimal required content"| MODELS
+  SERVER --> STORAGE
 ```
 
 Next.js is a presentation/BFF-free client for the MVP; authorization and domain rules live in Spring. Upload bodies may pass directly to Spring. PostgreSQL is the system of record for normalized content, assertions, temporal relations, jobs, full-text indexes, and vectors. Uploaded archives are deleted after processing by default; long-term raw-archive retention is opt-in.
@@ -23,38 +30,50 @@ Each module contains `domain`, `application`, and `adapter` packages as needed. 
 
 ```mermaid
 flowchart TD
-  user --> shared
-  conversation --> user
-  conversation --> shared
-  provider --> user
-  provider --> shared
-  ingestion --> user
-  ingestion --> conversation
-  ingestion --> provider
-  ingestion --> shared
-  extraction --> conversation
-  extraction --> provider
-  extraction --> shared
-  provenance --> conversation
-  provenance --> extraction
-  provenance --> shared
-  entity --> conversation
-  entity --> provenance
-  entity --> shared
-  graph --> entity
-  graph --> provenance
-  graph --> shared
-  project --> entity
-  project --> conversation
-  project --> provenance
-  project --> shared
-  retrieval --> conversation
-  retrieval --> entity
-  retrieval --> graph
-  retrieval --> project
-  retrieval --> provenance
-  retrieval --> provider
-  retrieval --> shared
+  USER["user"]
+  SHARED["shared"]
+  CONVERSATION["conversation"]
+  PROVIDER["provider"]
+  INGESTION["ingestion"]
+  EXTRACTION["extraction"]
+  PROVENANCE["provenance"]
+  ENTITY["entity"]
+  GRAPH["graph"]
+  PROJECT["project"]
+  RETRIEVAL["retrieval"]
+
+  USER --> SHARED
+  CONVERSATION --> USER
+  CONVERSATION --> SHARED
+  PROVIDER --> USER
+  PROVIDER --> SHARED
+  INGESTION --> USER
+  INGESTION --> CONVERSATION
+  INGESTION --> PROVIDER
+  INGESTION --> SHARED
+  EXTRACTION --> CONVERSATION
+  EXTRACTION --> PROVIDER
+  EXTRACTION --> SHARED
+  PROVENANCE --> CONVERSATION
+  PROVENANCE --> EXTRACTION
+  PROVENANCE --> SHARED
+  ENTITY --> CONVERSATION
+  ENTITY --> PROVENANCE
+  ENTITY --> SHARED
+  GRAPH --> ENTITY
+  GRAPH --> PROVENANCE
+  GRAPH --> SHARED
+  PROJECT --> ENTITY
+  PROJECT --> CONVERSATION
+  PROJECT --> PROVENANCE
+  PROJECT --> SHARED
+  RETRIEVAL --> CONVERSATION
+  RETRIEVAL --> ENTITY
+  RETRIEVAL --> GRAPH
+  RETRIEVAL --> PROJECT
+  RETRIEVAL --> PROVENANCE
+  RETRIEVAL --> PROVIDER
+  RETRIEVAL --> SHARED
 ```
 
 Arrows mean “may depend on.” `graph` and `project` consume entity/extraction facts rather than calling each other. Retrieval composes their read APIs. Events must not create hidden circular command flows.
@@ -91,23 +110,36 @@ A future native conversation separates **Conversation**, **Message**, and **Gene
 
 ## Processing pipelines
 
+The first synchronous import slice follows this provider-neutral boundary:
+
+```text
+Source-specific representation
+        -> ConversationImporter (parse + validate + normalize)
+        -> NormalizedConversation
+        -> ConversationImportService (ordered batch + summary)
+        -> ConversationIngestionService (identity + fingerprint + idempotency + conflict + per-conversation transaction)
+        -> PostgreSQL (conversation and message storage)
+```
+
+Importers have no persistence dependency and do not reproduce ingestion rules. Generic JSON is the first adapter; future provider exports, browser extraction, and third-party exporter connectors implement the same normalization seam. Dynamic loading and plugin infrastructure are deliberately outside this boundary.
+
 ```mermaid
 sequenceDiagram
-  participant I as Ingestion worker
-  participant C as Conversation
-  participant E as Extraction worker
-  participant R as Entity resolution
-  participant G as Graph projector
-  participant P as Project projector
-  I->>C: idempotent normalized conversation/messages
-  C-->>E: ConversationNormalized (outbox)
-  E->>E: chunk, structured generate, validate
-  E-->>R: immutable detections + evidence
-  R->>R: canonicalize or create review candidate
-  R-->>G: entity/assertion events
-  R-->>P: project/assertion events
-  G->>G: append/close temporal relations
-  P->>P: append state; rebuild current projection
+  participant INGEST as Ingestion worker
+  participant CONV as Conversation module
+  participant EXTRACT as Extraction worker
+  participant RESOLVE as Entity resolution
+  participant GRAPH as Graph projector
+  participant PROJECT as Project projector
+  INGEST->>CONV: Store normalized conversation idempotently
+  CONV-->>EXTRACT: Publish ConversationNormalized event
+  EXTRACT->>EXTRACT: Chunk, generate, and validate
+  EXTRACT-->>RESOLVE: Send immutable detections and evidence
+  RESOLVE->>RESOLVE: Canonicalize or create review candidate
+  RESOLVE-->>GRAPH: Publish entity and assertion events
+  RESOLVE-->>PROJECT: Publish project and assertion events
+  GRAPH->>GRAPH: Append or close temporal relations
+  PROJECT->>PROJECT: Append state and rebuild current projection
 ```
 
 ### Jobs and transactions

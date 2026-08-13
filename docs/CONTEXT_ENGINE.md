@@ -137,22 +137,36 @@ Messages supply evidence; entities supply identity; the graph supplies relations
 
 ```mermaid
 flowchart TD
- Q[Query + optional project/time scope] --> I[Intent and scope detection]
- I --> C{Parallel candidate retrieval}
- C --> S[Semantic vector]
- C --> X[Lexical/entity aliases]
- C --> G[Bounded graph traversal]
- C --> P[Project current state]
- C --> T[Recent/temporal events]
- S --> R[Deduplicate and rank]
- X --> R
- G --> R
- P --> R
- T --> R
- R --> B[Evidence-budgeted context packet]
- B --> L[Answer model]
- L --> V[Citation/claim validation]
- V --> A[Answer + evidence or not-found]
+  QUERY["Query with optional project or time scope"]
+  INTENT["Intent and scope detection"]
+  CANDIDATES{"Parallel candidate retrieval"}
+  SEMANTIC["Semantic vector search"]
+  LEXICAL["Lexical and entity alias search"]
+  GRAPH["Bounded graph traversal"]
+  PROJECT["Current project state"]
+  TEMPORAL["Recent and temporal events"]
+  RANK["Deduplicate and rank"]
+  PACKET["Evidence-budgeted context packet"]
+  MODEL["Answer model"]
+  VALIDATE["Citation and claim validation"]
+  ANSWER["Answer with evidence or not-found result"]
+
+  QUERY --> INTENT
+  INTENT --> CANDIDATES
+  CANDIDATES --> SEMANTIC
+  CANDIDATES --> LEXICAL
+  CANDIDATES --> GRAPH
+  CANDIDATES --> PROJECT
+  CANDIDATES --> TEMPORAL
+  SEMANTIC --> RANK
+  LEXICAL --> RANK
+  GRAPH --> RANK
+  PROJECT --> RANK
+  TEMPORAL --> RANK
+  RANK --> PACKET
+  PACKET --> MODEL
+  MODEL --> VALIDATE
+  VALIDATE --> ANSWER
 ```
 
 Intent detection first uses rules/entities (question words, known aliases, explicit scope); a cheap model handles ambiguity. A database-decision question gives structured current accepted decisions the strongest prior. Candidate scores combine source relevance, entity match, current-vs-historical intent, confidence, evidence quality, recency, and diversity. Scores are logged without sensitive text for evaluation.

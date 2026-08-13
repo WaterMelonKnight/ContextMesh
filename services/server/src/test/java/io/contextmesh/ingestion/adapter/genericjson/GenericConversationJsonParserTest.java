@@ -32,6 +32,21 @@ class GenericConversationJsonParserTest {
         assertThatThrownBy(() -> conversation.metadata().put("x", "y")).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test void importsBatchWithoutReorderingConversationsOrMessages() {
+        String json = """
+                {"schemaVersion":"1","conversations":[
+                  {"externalId":"first","sourceType":"IMPORTED_CONVERSATION","messages":[
+                    {"externalId":"later","role":"USER","createdAt":"2026-02-01T00:00:00Z","content":[{"type":"TEXT","text":"later"}]},
+                    {"externalId":"earlier","role":"ASSISTANT","createdAt":"2026-01-01T00:00:00Z","content":[{"type":"TEXT","text":"earlier"}]}]},
+                  {"externalId":"second","sourceType":"IMPORTED_CONVERSATION","messages":[]}
+                ]}
+                """;
+        var conversations = parser.parseAll(json);
+        assertThat(conversations).extracting(c -> c.externalId()).containsExactly("first", "second");
+        assertThat(conversations.getFirst().messages()).extracting(m -> m.externalId())
+                .containsExactly("later", "earlier");
+    }
+
     @Test void keepsGenerationOnEachAssistantMessage() {
         var one = parse("assistant-generation.json").messages().getFirst().generation();
         assertThat(one.provider()).isEqualTo("openai");
