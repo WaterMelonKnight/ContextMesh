@@ -27,5 +27,7 @@ class DatabaseIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from flyway_schema_history where success", Integer.class)).isPositive();
         assertThat(jdbcTemplate.queryForObject("select extname from pg_extension where extname = 'vector'", String.class)).isEqualTo("vector");
         assertThat(jdbcTemplate.queryForObject("select count(*) from workspaces", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from conversations", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from messages", Integer.class)).isZero();
     }
 }
