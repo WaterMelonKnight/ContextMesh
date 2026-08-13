@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -32,8 +33,15 @@ final class JdbcConversationPersistenceAdapter implements ConversationPersistenc
                 ? "fingerprint:" + fingerprint
                 : "external:" + conversation.sourceType().name() + ":" + conversation.sourceProvider()
                     + ":" + conversation.externalId();
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?, 0))",
-                String.class, workspaceId + ":" + identity);
+        jdbc.execute(connection -> {
+            var statement = connection.prepareStatement(
+                    "select pg_advisory_xact_lock(hashtextextended(?, 0))");
+            statement.setString(1, workspaceId + ":" + identity);
+            return statement;
+        }, statement -> {
+            statement.execute();
+            return null;
+        });
         String sql;
         Object[] arguments;
         if (conversation.externalId() != null) {
@@ -51,9 +59,9 @@ final class JdbcConversationPersistenceAdapter implements ConversationPersistenc
                     """;
             arguments = new Object[]{workspaceId, fingerprint};
         }
-        return jdbc.query(sql, (resultSet, row) -> new StoredConversation(
-                resultSet.getObject("id", UUID.class), resultSet.getString("source_fingerprint")), arguments)
-                .stream().findFirst();
+        return Optional.ofNullable(DataAccessUtils.singleResult(jdbc.query(sql,
+                (resultSet, row) -> new StoredConversation(resultSet.getObject("id", UUID.class),
+                        resultSet.getString("source_fingerprint")), arguments)));
     }
 
     @Override

@@ -13,6 +13,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,6 +104,43 @@ class ConversationIngestionServiceIntegrationTest {
     }
 
     @Test
+    void nullableProviderIsPartOfDatabaseEnforcedExternalIdentity() {
+        var source = conversation("nullable-provider", "No provider", Map.of());
+        source = new NormalizedConversation(source.externalId(), source.title(), source.sourceType(), null,
+                source.createdAt(), source.updatedAt(), source.messages(), source.metadata());
+
+        var imported = service.ingest(workspaceA, source);
+        var duplicate = service.ingest(workspaceA, source);
+
+        assertThat(imported.status()).isEqualTo(IngestionStatus.IMPORTED);
+        assertThat(duplicate.status()).isEqualTo(IngestionStatus.SKIPPED_DUPLICATE);
+        assertThat(jdbc.queryForObject("""
+                select count(*) from conversations
+                where workspace_id = ? and source_provider is null and external_id = ?
+                """, Integer.class, workspaceA, source.externalId())).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentImportsOfSameSourceCreateOneConversation() throws Exception {
+        var source = conversation("concurrent-source", "Concurrent");
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> ingestAfterBarrier(source, ready, start));
+            var second = executor.submit(() -> ingestAfterBarrier(source, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(first.get(20, TimeUnit.SECONDS).status(),
+                    second.get(20, TimeUnit.SECONDS).status()))
+                    .containsExactlyInAnyOrder(IngestionStatus.IMPORTED, IngestionStatus.SKIPPED_DUPLICATE);
+        }
+        assertThat(jdbc.queryForObject("""
+                select count(*) from conversations where workspace_id = ? and external_id = ?
+                """, Integer.class, workspaceA, source.externalId())).isEqualTo(1);
+    }
+
+    @Test
     void messageFailureRollsBackConversationAndEarlierMessages() {
         var valid = conversation("rollback-source", "Rollback");
         var oversized = new NormalizedMessage("x".repeat(501), MessageRole.USER,
@@ -122,6 +162,13 @@ class ConversationIngestionServiceIntegrationTest {
         UUID id = UUID.randomUUID();
         jdbc.update("insert into workspaces(id, owner_user_id, name) values (?, ?, ?)", id, user, name);
         return id;
+    }
+
+    private IngestionResult ingestAfterBarrier(NormalizedConversation source, CountDownLatch ready,
+                                                CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start barrier timed out");
+        return service.ingest(workspaceA, source);
     }
 
     private static NormalizedConversation conversation(String externalId, String title) {

@@ -16,7 +16,7 @@ CREATE TABLE conversations (
 );
 
 CREATE UNIQUE INDEX conversations_external_source_identity_unique
-    ON conversations (workspace_id, source_type, COALESCE(source_provider, ''), external_id)
+    ON conversations (workspace_id, source_type, source_provider, external_id) NULLS NOT DISTINCT
     WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX conversations_fingerprint_identity_unique
     ON conversations (workspace_id, source_fingerprint)
