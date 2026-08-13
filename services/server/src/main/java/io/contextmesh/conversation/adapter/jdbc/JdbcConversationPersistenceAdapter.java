@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.support.DataAccessUtils;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -33,14 +34,13 @@ final class JdbcConversationPersistenceAdapter implements ConversationPersistenc
                 ? "fingerprint:" + fingerprint
                 : "external:" + conversation.sourceType().name() + ":" + conversation.sourceProvider()
                     + ":" + conversation.externalId();
-        jdbc.execute(connection -> {
-            var statement = connection.prepareStatement(
-                    "select pg_advisory_xact_lock(hashtextextended(?, 0))");
-            statement.setString(1, workspaceId + ":" + identity);
-            return statement;
-        }, statement -> {
-            statement.execute();
-            return null;
+        jdbc.execute((ConnectionCallback<Void>) connection -> {
+            try (var statement = connection.prepareStatement(
+                    "select pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+                statement.setString(1, workspaceId + ":" + identity);
+                statement.execute();
+                return null;
+            }
         });
         String sql;
         Object[] arguments;
