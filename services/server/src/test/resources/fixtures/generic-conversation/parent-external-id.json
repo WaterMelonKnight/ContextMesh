@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ]
+      },
+      {
+        "externalId": "m2",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Branch"
+          }
+        ],
+        "parentExternalId": "m1"
+      }
+    ]
+  }
+}

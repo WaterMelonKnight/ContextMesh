@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ],
+        "createdAt": "yesterday"
+      }
+    ]
+  }
+}

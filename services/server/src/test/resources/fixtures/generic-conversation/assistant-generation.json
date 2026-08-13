@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hi"
+          }
+        ],
+        "generation": {
+          "provider": "openai",
+          "model": "gpt-example"
+        }
+      }
+    ]
+  }
+}

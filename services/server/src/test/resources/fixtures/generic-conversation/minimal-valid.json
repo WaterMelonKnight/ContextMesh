@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Hello"
+          }
+        ]
+      }
+    ]
+  }
+}

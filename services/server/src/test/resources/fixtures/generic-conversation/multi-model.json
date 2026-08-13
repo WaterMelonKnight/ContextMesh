@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1",
+  "conversation": {
+    "sourceType": "IMPORTED_CONVERSATION",
+    "messages": [
+      {
+        "externalId": "m1",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "First"
+          }
+        ],
+        "generation": {
+          "provider": "openai",
+          "model": "gpt-example"
+        }
+      },
+      {
+        "externalId": "m2",
+        "role": "USER",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Again"
+          }
+        ]
+      },
+      {
+        "externalId": "m3",
+        "role": "ASSISTANT",
+        "content": [
+          {
+            "type": "TEXT",
+            "text": "Second"
+          }
+        ],
+        "generation": {
+          "provider": "anthropic",
+          "model": "claude-example"
+        }
+      }
+    ]
+  }
+}
