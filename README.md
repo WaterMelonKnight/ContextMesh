@@ -41,6 +41,19 @@ cd services/server
 ./mvnw spring-boot:run
 ```
 
+To enable a trusted OpenAI-compatible endpoint, configure it before starting the backend. No
+provider credential is required while the adapter is disabled:
+
+```bash
+export CONTEXTMESH_OPENAI_ENABLED=true
+export CONTEXTMESH_OPENAI_BASE_URL=http://localhost:11434/v1
+export CONTEXTMESH_OPENAI_API_KEY=replace-with-your-key
+cd services/server && ./mvnw spring-boot:run
+```
+
+The stable request provider ID is `openai-compatible`; each turn still selects its model. Endpoint
+configuration is trusted local-user/administrator configuration in this release.
+
 Start the frontend in a third terminal:
 
 ```bash

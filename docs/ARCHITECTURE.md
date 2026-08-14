@@ -1,5 +1,29 @@
 # Software architecture
 
+## OpenAI-compatible generation adapter
+
+Native generation retains a provider-neutral dependency direction:
+
+```text
+NativeGenerationService -> ModelProvider -> OpenAICompatibleModelProvider
+  -> Java HttpClient POST {baseUrl}/chat/completions
+  -> incremental provider SSE -> GenerationEvent
+  -> ContextMesh SSE observer + completed ASSISTANT persistence
+```
+
+The adapter owns all HTTP DTOs, role translation, bearer authentication, and SSE parsing. It uses
+the JDK HTTP client rather than an OpenAI SDK or a reactive application stack, and consumes the
+response `InputStream` as lines arrive rather than buffering it. `openai-compatible` identifies a
+wire protocol, not an assertion that the endpoint or model vendor is OpenAI. Configurable HTTP or
+HTTPS base URLs intentionally support local endpoints and trusted gateways.
+
+The provider bean joins the existing `ModelProviderRegistry` only when enabled. The application
+service does not branch on provider identity, and `FakeModelProvider` remains available.
+
+The current `TURN_GUARDS` are JVM-local hash-striped locks. They prevent overlapping turns for a
+conversation in one process, but cannot coordinate multiple instances and may serialize unrelated
+conversations sharing a stripe. Distributed coordination is intentionally deferred.
+
 ## Architectural drivers
 
 Optimize for one AI-assisted developer, rapid vertical slices, low cost, privacy, evidence integrity, and a future hosted offering. The MVP is a **modular monolith** with one PostgreSQL database and database-backed workers. Maven is chosen over Gradle because its declarative lifecycle, wrapper, dependency convergence tooling, and conventional Spring layout give humans and coding agents fewer build-language choices.

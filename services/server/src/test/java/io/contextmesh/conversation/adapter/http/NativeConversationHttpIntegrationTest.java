@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
 import io.contextmesh.conversation.application.ConversationNotFoundException;
 import io.contextmesh.conversation.application.NativeConversationService;
 import io.contextmesh.conversation.domain.MessageRole;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -40,6 +44,46 @@ class NativeConversationHttpIntegrationTest {
     @Container @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static final HttpServer upstream = startUpstream();
+
+    static HttpServer startUpstream() {
+        try {
+        var server = HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            var request = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            if (request.contains("failure-model")) {
+                exchange.sendResponseHeaders(500, -1);
+                exchange.close();
+                return;
+            }
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, 0);
+            for (var chunk : List.of(
+                    "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n",
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n",
+                    "data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n",
+                    "data: [DONE]\n\n")) {
+                exchange.getResponseBody().write(chunk.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                exchange.getResponseBody().flush();
+            }
+            exchange.close();
+        });
+        server.start();
+        return server;
+        } catch (java.io.IOException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    @AfterAll static void stopUpstream() { upstream.stop(0); }
+
+    @DynamicPropertySource
+    static void providerProperties(DynamicPropertyRegistry registry) {
+        registry.add("contextmesh.providers.openai-compatible.enabled", () -> "true");
+        registry.add("contextmesh.providers.openai-compatible.api-key", () -> "integration-secret");
+        registry.add("contextmesh.providers.openai-compatible.base-url",
+                () -> "http://127.0.0.1:" + upstream.getAddress().getPort() + "/v1");
+    }
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper objectMapper;
@@ -195,6 +239,49 @@ class NativeConversationHttpIntegrationTest {
         assertThat(persisted.messages().get(1).generation().model()).isEqualTo("fake-model");
         assertThat(persisted.messages().get(1).parentExternalId())
                 .isEqualTo(persisted.messages().get(0).stableId());
+    }
+
+    @Test
+    void streamsOpenAICompatibleDeltasAndPersistsProviderMetadata() throws Exception {
+        UUID id = service.createConversation(workspaceId, "Real adapter").id();
+        var initial = mvc.perform(post(base() + "/" + id + "/turns")
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {"provider":"openai-compatible","model":"compatible-model",
+                                 "content":[{"type":"TEXT","text":"Hello"}]}
+                                """))
+                .andExpect(status().isOk()).andReturn();
+        initial.getAsyncResult(5000);
+        var body = mvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).containsSubsequence("event:started", "event:delta", "Hello",
+                "event:delta", " world", "event:completed");
+        var messages = service.getConversation(workspaceId, id).messages();
+        assertThat(messages).extracting(message -> message.role())
+                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
+        assertThat(messages.get(1).content()).containsExactly(new TextContentPart("Hello world"));
+        assertThat(messages.get(1).generation().provider()).isEqualTo("openai-compatible");
+        assertThat(messages.get(1).generation().model()).isEqualTo("compatible-model");
+    }
+
+    @Test
+    void realProviderFailureKeepsUserWithoutAssistant() throws Exception {
+        UUID id = service.createConversation(workspaceId, "Failed adapter").id();
+        var initial = mvc.perform(post(base() + "/" + id + "/turns")
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {"provider":"openai-compatible","model":"failure-model",
+                                 "content":[{"type":"TEXT","text":"Keep me"}]}
+                                """))
+                .andExpect(status().isOk()).andReturn();
+        initial.getAsyncResult(5000);
+        var body = mvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("event:failed").contains("PROVIDER_FAILURE").doesNotContain("integration-secret");
+        assertThat(service.getConversation(workspaceId, id).messages())
+                .extracting(message -> message.role()).containsExactly(MessageRole.USER);
     }
 
     private String base() { return "/api/v1/workspaces/" + workspaceId + "/conversations"; }

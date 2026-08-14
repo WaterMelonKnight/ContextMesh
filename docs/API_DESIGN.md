@@ -1,5 +1,22 @@
 # REST API design (v1)
 
+## OpenAI-compatible Native Talk turns
+
+`POST /api/v1/workspaces/{workspaceId}/conversations/{conversationId}/turns` accepts
+`{"provider":"openai-compatible","model":"...","content":[...]}` through the existing Native
+Talk contract. SYSTEM, USER, and ASSISTANT text history becomes corresponding chat-completion roles,
+and the adapter sends `stream: true` to `POST {baseUrl}/chat/completions`.
+
+Provider SSE `delta.content` values are forwarded in order. Role, usage, finish metadata, and empty
+deltas are ignored. `[DONE]` is required for success: premature EOF, malformed JSON,
+timeout/connection errors, and HTTP failures do not become partial successes. Native Talk exposes a
+provider-neutral `PROVIDER_FAILURE` and never includes upstream bodies, headers, credentials, or
+stack traces. The USER remains and no ASSISTANT is stored on failure. On success the service stores
+one complete ASSISTANT with provider/model metadata and emits its message ID.
+
+Browser SSE disconnect is isolated from upstream execution, so generation and completed persistence
+continue. Explicit cancellation remains out of scope.
+
 ## Conventions
 
 Base path is `/api/v1`. JSON uses camelCase and ISO-8601 UTC timestamps. IDs are opaque strings. Collection endpoints use cursor pagination (`items`, `nextCursor`) and bounded `limit` (default 25, max 100). Errors use RFC 9457 Problem Details with stable `type`, `title`, `status`, `detail`, `instance`, and optional `errors`/`correlationId`.
