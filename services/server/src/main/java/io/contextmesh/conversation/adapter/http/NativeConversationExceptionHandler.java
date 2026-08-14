@@ -2,6 +2,7 @@ package io.contextmesh.conversation.adapter.http;
 
 import io.contextmesh.conversation.application.ConversationNotFoundException;
 import io.contextmesh.conversation.application.ImportedConversationImmutableException;
+import io.contextmesh.provider.application.UnknownModelProviderException;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -29,6 +30,12 @@ public final class NativeConversationExceptionHandler {
                 : "Request JSON contains an invalid or unknown value";
         return problem(HttpStatus.BAD_REQUEST, "Invalid Native Conversation Request", detail,
                 "invalid-native-conversation-request");
+    }
+
+    @ExceptionHandler(UnknownModelProviderException.class)
+    ProblemDetail unknownProvider(UnknownModelProviderException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Unknown Model Provider", exception.getMessage(),
+                "unknown-model-provider");
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail, String type) {

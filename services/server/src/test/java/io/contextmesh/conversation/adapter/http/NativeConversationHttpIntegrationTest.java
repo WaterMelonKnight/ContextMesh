@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.contextmesh.conversation.application.ConversationNotFoundException;
@@ -167,6 +168,33 @@ class NativeConversationHttpIntegrationTest {
         UUID id = service.createConversation(workspaceId, "Private").id();
         assertThatThrownBy(() -> service.getConversation(UUID.randomUUID(), id))
                 .isInstanceOf(ConversationNotFoundException.class);
+    }
+
+    @Test
+    void streamsFakeTurnThenPersistsUserAndCompletedAssistant() throws Exception {
+        UUID id = service.createConversation(workspaceId, "Generated").id();
+        var initial = mvc.perform(post(base() + "/" + id + "/turns")
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {"provider":"fake","model":"fake-model",
+                                 "content":[{"type":"TEXT","text":"Hello"}]}
+                                """))
+                .andExpect(status().isOk()).andReturn();
+        initial.getAsyncResult(5000);
+        String body = mvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).containsSubsequence("event:started", "event:delta", "Fake ",
+                "event:delta", "response", "event:completed");
+
+        var persisted = service.getConversation(workspaceId, id);
+        assertThat(persisted.messages()).hasSize(2);
+        assertThat(persisted.messages()).extracting(message -> message.role())
+                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
+        assertThat(persisted.messages().get(1).content()).containsExactly(new TextContentPart("Fake response"));
+        assertThat(persisted.messages().get(1).generation().provider()).isEqualTo("fake");
+        assertThat(persisted.messages().get(1).generation().model()).isEqualTo("fake-model");
+        assertThat(persisted.messages().get(1).parentExternalId())
+                .isEqualTo(persisted.messages().get(0).stableId());
     }
 
     private String base() { return "/api/v1/workspaces/" + workspaceId + "/conversations"; }

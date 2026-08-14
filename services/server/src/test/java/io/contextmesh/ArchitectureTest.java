@@ -31,7 +31,7 @@ class ArchitectureTest {
             .layer("Retrieval").definedBy("io.contextmesh.retrieval..")
             .whereLayer("Shared").mayNotAccessAnyLayer()
             .whereLayer("User").mayOnlyAccessLayers("Shared")
-            .whereLayer("Conversation").mayOnlyAccessLayers("User", "Shared")
+            .whereLayer("Conversation").mayOnlyAccessLayers("User", "Provider", "Shared")
             .whereLayer("Provider").mayOnlyAccessLayers("User", "Shared")
             .whereLayer("Ingestion").mayOnlyAccessLayers("User", "Conversation", "Provider", "Shared")
             .whereLayer("Extraction").mayOnlyAccessLayers("Conversation", "Provider", "Shared")
