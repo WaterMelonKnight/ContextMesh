@@ -88,10 +88,18 @@ SSE send failure disables further delivery attempts but does not interrupt provi
 assistant persistence. Provider exceptions and invalid provider event ordering still terminate the
 generation lifecycle and never persist an assistant message.
 
-For v1, the provider request context is simply the ordered native conversation history after the
-new user message. Later, Context Sources and Context Assembly can produce a ContextPacket and map
-that packet into the same provider-neutral request. Imported conversations cannot be generated
-directly and will only become sources for that future assembly step.
+The first continuation path links one new native conversation to one immutable imported
+conversation through a relational provenance record. An optional cutoff identifies an imported
+message; context assembly selects the imported prefix through that message, inclusive. With no
+cutoff it selects the complete currently stored import. It then appends the ordered native history
+(including the newly persisted USER message) before making the provider-neutral request.
+
+Imported message rows are never copied into the native conversation. Only new native USER and
+successfully completed ASSISTANT messages are persisted against the continuation. Deleting either
+owned conversation cascades its continuation link, while deletion of a cutoff message is restricted;
+normal application behavior keeps imported messages immutable. This raw-prefix resolver is the
+first small context-assembly boundary. A future ContextPacket, compression, or retrieval strategy
+can extend or replace selection without introducing imported persistence into model providers.
 
 ```mermaid
 flowchart LR
@@ -99,7 +107,7 @@ flowchart LR
   NORMALIZE --> IMPORTED["immutable imported conversation"]
   TALK["Native Talk"] --> CREATE["create native conversation"]
   CREATE --> APPEND["append native messages"]
-  IMPORTED -. "future context assembly" .-> CREATE
+  IMPORTED -->|"relational origin + selected prefix"| CREATE
 ```
 
 ```mermaid

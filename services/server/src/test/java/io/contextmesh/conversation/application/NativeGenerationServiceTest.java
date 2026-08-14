@@ -47,7 +47,7 @@ class NativeGenerationServiceTest {
                 eq(new GenerationMetadata("fake", "fake-model")))).thenReturn(assistant);
 
         var events = new ArrayList<GenerationEvent>();
-        new NativeGenerationService(conversations, new ModelProviderRegistry(List.of(provider)))
+        new NativeGenerationService(conversations, new ModelProviderRegistry(List.of(provider)), (w, c) -> List.of())
                 .generateTurn(workspace, conversation, "fake", "fake-model", List.of(new TextContentPart("Hello")))
                 .consume(events::add);
 
@@ -62,6 +62,35 @@ class NativeGenerationServiceTest {
     }
 
     @Test
+    void prependsSelectedImportedContextWithoutPersistingIt() {
+        var conversations = mock(NativeConversationService.class);
+        var captured = new AtomicReference<ModelGenerationRequest>();
+        var imported = List.of(
+                message(UUID.randomUUID(), "i0", 0, MessageRole.SYSTEM, "System", null, null),
+                message(UUID.randomUUID(), "i1", 1, MessageRole.USER, "Imported question", "i0", null));
+        var empty = view(ConversationSourceType.NATIVE_CONVERSATION, List.of());
+        var user = message(UUID.randomUUID(), "n0", 0, MessageRole.USER, "Continue", null, null);
+        var assistant = message(UUID.randomUUID(), "n1", 1, MessageRole.ASSISTANT,
+                "Fake response", "n0", new GenerationMetadata("fake", "fake-model"));
+        when(conversations.getConversation(workspace, conversation)).thenReturn(empty, empty,
+                view(ConversationSourceType.NATIVE_CONVERSATION, List.of(user)));
+        when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.USER), any(), eq(null)))
+                .thenReturn(user);
+        when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.ASSISTANT), any(), any()))
+                .thenReturn(assistant);
+
+        new NativeGenerationService(conversations,
+                new ModelProviderRegistry(List.of(provider(captured, false))), (w, c) -> imported)
+                .generateTurn(workspace, conversation, "fake", "fake-model",
+                        List.of(new TextContentPart("Continue"))).consume(event -> {});
+
+        assertThat(captured.get().messages()).extracting(io.contextmesh.provider.application.ModelMessage::text)
+                .containsExactly("System", "Imported question", "Continue");
+        verify(conversations, org.mockito.Mockito.times(2)).appendMessage(eq(workspace), eq(conversation),
+                any(), any(), any());
+    }
+
+    @Test
     void providerFailureKeepsUserAndDoesNotAppendAssistant() {
         var conversations = mock(NativeConversationService.class);
         var prior = view(ConversationSourceType.NATIVE_CONVERSATION, List.of());
@@ -71,7 +100,7 @@ class NativeGenerationServiceTest {
         when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.USER), any(), eq(null)))
                 .thenReturn(user);
         var events = new ArrayList<GenerationEvent>();
-        new NativeGenerationService(conversations, new ModelProviderRegistry(List.of(provider(null, true))))
+        new NativeGenerationService(conversations, new ModelProviderRegistry(List.of(provider(null, true))), (w, c) -> List.of())
                 .generateTurn(workspace, conversation, "fake", "fake-model", List.of(new TextContentPart("Hello")))
                 .consume(events::add);
         assertThat(events).containsExactly(new GenerationEvent.Started("fake", "fake-model"),
@@ -140,7 +169,7 @@ class NativeGenerationServiceTest {
         when(conversations.getConversation(workspace, conversation))
                 .thenReturn(view(ConversationSourceType.IMPORTED_CONVERSATION, List.of()));
         var service = new NativeGenerationService(conversations,
-                new ModelProviderRegistry(List.of(provider(null, false))));
+                new ModelProviderRegistry(List.of(provider(null, false))), (w, c) -> List.of());
         assertThatThrownBy(() -> service.generateTurn(workspace, conversation, "fake", "fake-model",
                 List.of(new TextContentPart("Hello"))))
                 .isInstanceOf(ImportedConversationImmutableException.class);
@@ -177,7 +206,7 @@ class NativeGenerationServiceTest {
         when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.ASSISTANT), any(),
                 eq(new GenerationMetadata("fake", "fake-model")))).thenReturn(assistant);
         return new Fixture(new NativeGenerationService(conversations,
-                new ModelProviderRegistry(List.of(provider))), conversations);
+                new ModelProviderRegistry(List.of(provider)), (w, c) -> List.of()), conversations);
     }
 
     private record Fixture(NativeGenerationService service, NativeConversationService conversations) {}
