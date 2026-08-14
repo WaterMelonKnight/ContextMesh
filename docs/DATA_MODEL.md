@@ -1,5 +1,11 @@
 # Data model
 
+Native generation reuses the existing message-level `generation_provider` and `generation_model`
+columns. They are populated by the generation application service on a completed assistant message,
+not accepted as authoritative client metadata for a generated turn. Streaming deltas and failed
+or partial assistant output are intentionally not persisted, so this slice requires no schema
+migration or generation table.
+
 ## Principles
 
 PostgreSQL is the source of truth. UUIDv7 (or application-generated time-sortable UUIDs) are primary keys. Every user-owned row carries `workspace_id`; uniqueness is scoped by it. Timestamps are UTC `timestamptz`. Original normalized messages and extraction results are immutable except for deletion. Derived “current” projections are rebuildable from versioned assertions and history.

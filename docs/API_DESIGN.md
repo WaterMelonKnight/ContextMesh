@@ -8,6 +8,20 @@ Phase 0 implements only `GET /api/v1/health`, returning non-sensitive applicatio
 
 Authentication is same-site secure session cookie for the initial web app; unsafe requests require CSRF protection. The authenticated workspace is selected through `/workspaces/{id}` in authorization context or a validated `X-Workspace-Id`; clients can never submit ownership fields in bodies. All endpoints enforce workspace isolation.
 
+## Native Talk generation
+
+`POST /api/v1/workspaces/{workspaceId}/conversations/{conversationId}/turns` accepts a provider,
+model, and a non-empty list of text content parts. It is available only for native conversations
+and returns `text/event-stream`. The provider-neutral SSE sequence is `started`, one or more
+`delta`, then `completed`; completed data includes the persisted assistant message ID, provider,
+and model. Errors detected before streaming use Problem Details. A provider failure after streaming
+begins emits an `error` event with a stable sanitized code/message and terminates the stream.
+
+The user message is committed before provider execution. Deltas are not database rows. On normal
+completion their text is aggregated into one assistant message; on failure the user message stays
+and no assistant message is written. The initial `fake` provider deterministically emits `Fake `
+and `response` chunks for development and integration testing and never contacts a network.
+
 Long work returns `202 Accepted` with a resource URL. `Idempotency-Key` is required for imports and context queries that may be retried. Optimistic `ETag`/`If-Match` is used for future manual resolution.
 
 ## Imports

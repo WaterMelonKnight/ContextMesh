@@ -36,6 +36,34 @@ conversation or invokes import duplicate/conflict handling. `ConversationQueryPo
 workspace-scoped read model for both source kinds. Imported conversations remain immutable through
 this boundary.
 
+Native Talk generation is streaming-first and depends only on the provider module's neutral
+`ModelProvider`, `ModelGenerationRequest`, and `GenerationEvent` contracts. The initial
+`GenerationStream` is a small synchronous subscription interface: it delivers incremental events
+without introducing Reactor into the MVC application, and an adapter can bridge it to SSE (or a
+future reactive publisher) without changing provider implementations. The deterministic `fake`
+adapter is the only provider implementation in this slice and performs no network access.
+
+```mermaid
+flowchart TD
+  REQUEST["Native turn request"] --> USER["persist USER message - transaction A"]
+  USER --> CONTEXT["ordered native messages"]
+  CONTEXT --> PROVIDER["ModelProvider stream - no database transaction"]
+  PROVIDER --> DELTAS["STARTED and TEXT_DELTA events"]
+  DELTAS --> COMPLETE["COMPLETED"]
+  COMPLETE --> ASSISTANT["persist ASSISTANT message - transaction B"]
+```
+
+Provider failure leaves transaction A committed and writes no partial assistant message. Text
+deltas are ephemeral; only a successfully completed aggregate is appended, with the resolved
+provider and requested model. A small in-process striped guard serializes turns for one
+conversation in one server process; distributed turn coordination is intentionally deferred.
+No PostgreSQL transaction or row lock spans provider execution.
+
+For v1, the provider request context is simply the ordered native conversation history after the
+new user message. Later, Context Sources and Context Assembly can produce a ContextPacket and map
+that packet into the same provider-neutral request. Imported conversations cannot be generated
+directly and will only become sources for that future assembly step.
+
 ```mermaid
 flowchart LR
   SOURCE["Imported source"] --> NORMALIZE["import and normalize"]
@@ -101,7 +129,7 @@ Arrows mean “may depend on.” `graph` and `project` consume entity/extraction
 |---|---|---|---|---|---|
 | `user` | Users, workspaces, membership/ownership, provider credentials | `WorkspaceAccess`, `CredentialVault` | `shared` | `WorkspaceDeletionRequested` | — |
 | `ingestion` | Import batch/file lifecycle, adapter selection, normalization jobs | `ImportService`, `ConversationImportAdapter` | `user`, `conversation`, `provider`, `shared` | `ConversationImported`, `ConversationNormalized`, `ImportCompleted` | workspace deletion |
-| `conversation` | Provider-independent conversations/messages and source identity | `ConversationCatalog`, `MessageEvidenceReader` | `user`, `shared` | `ConversationStored` | workspace deletion |
+| `conversation` | Provider-independent conversations/messages, source identity, and Native Talk turn orchestration | `ConversationCatalog`, `MessageEvidenceReader`, `NativeGenerationService` | `user`, `provider`, `shared` | `ConversationStored` | workspace deletion |
 | `provider` | Model/embedding clients, routing, credentials, usage metadata; no domain truth | `StructuredGenerationPort`, `EmbeddingPort`, `AnswerGenerationPort` | `user`, `shared` | `ProviderCallRecorded` | — |
 | `extraction` | Runs, immutable results, schemas/prompts, chunking and validation | `ExtractionScheduler`, `ExtractionResultReader` | `conversation`, `provider`, `shared` | `ExtractionCompleted`, `EntityDetected`, typed assertion detection events | `ConversationNormalized` |
 | `provenance` | Cross-cutting evidence records and validation; extraction-backed and manual provenance | `EvidenceWriter`, `EvidenceReader` | `conversation`, `extraction`, `shared` | — | — |
@@ -204,7 +232,7 @@ public interface AnswerGenerationPort {
 }
 ```
 
-Requests contain provider-neutral messages, model policy/cost tier, schema identifier + JSON Schema, timeout, and idempotency/correlation metadata. Results include parsed values or typed failures, usage, model identity, finish reason, and provider request ID. Adapters translate OpenAI/Anthropic/etc. Domain modules select a capability and policy, never a vendor model name. Streaming chat can be a later interface rather than contaminating extraction.
+Requests contain provider-neutral messages, model policy/cost tier, schema identifier + JSON Schema, timeout, and idempotency/correlation metadata. Results include parsed values or typed failures, usage, model identity, finish reason, and provider request ID. Adapters translate OpenAI/Anthropic/etc. Domain modules select a capability and policy, never a vendor model name. Native Talk uses its small streaming `ModelProvider` capability without contaminating extraction's structured-generation contracts.
 
 ## Deployment
 
