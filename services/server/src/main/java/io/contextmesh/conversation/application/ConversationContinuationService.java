@@ -4,6 +4,7 @@ import io.contextmesh.conversation.domain.ConversationSourceType;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ public class ConversationContinuationService {
     private final ContinuationPersistencePort continuations;
     private final Clock clock;
 
+    @Autowired
     public ConversationContinuationService(ConversationQueryPort queries,
             NativeConversationPersistencePort nativePersistence,
             ContinuationPersistencePort continuations) {
