@@ -12,7 +12,8 @@ import io.contextmesh.conversation.application.ConversationNotFoundException;
 import io.contextmesh.conversation.application.NativeConversationService;
 import io.contextmesh.conversation.domain.MessageRole;
 import io.contextmesh.conversation.domain.TextContentPart;
-import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -115,11 +116,12 @@ class NativeConversationHttpIntegrationTest {
                 .andExpect(status().isNotFound());
 
         UUID imported = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         jdbc.update("""
                 insert into conversations(id, workspace_id, source_type, external_id,
                   source_fingerprint, metadata, imported_at, created_at, updated_at)
                 values (?, ?, 'IMPORTED_CONVERSATION', 'external', ?, '{}'::jsonb, ?, ?, ?)
-                """, imported, workspaceId, "a".repeat(64), Instant.now(), Instant.now(), Instant.now());
+                """, imported, workspaceId, "a".repeat(64), now, now, now);
         mvc.perform(post(base() + "/" + imported + "/messages").contentType(MediaType.APPLICATION_JSON)
                         .content(userMessage("x"))).andExpect(status().isConflict());
     }
