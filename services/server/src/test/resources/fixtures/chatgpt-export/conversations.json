@@ -1,0 +1,27 @@
+[
+  {
+    "id": "chatgpt-conversation-1",
+    "title": "Unicode and branches",
+    "create_time": 1710000000.25,
+    "update_time": 1710000300,
+    "current_node": "assistant-current",
+    "mapping": {
+      "root": {"id":"root","parent":null,"children":["system"],"message":null},
+      "system": {"id":"system","parent":"root","children":["user-1"],"message":{"id":"system-message","author":{"role":"system"},"create_time":1710000001,"content":{"content_type":"text","parts":["Be helpful."]},"metadata":{}}},
+      "user-1": {"id":"user-1","parent":"system","children":["assistant-old","assistant-current"],"message":{"id":"user-message","author":{"role":"user"},"create_time":1710000002,"content":{"content_type":"text","parts":["你好，世界 🌍\n","```java\nSystem.out.println(\"hi\");\n```"]},"metadata":{}}},
+      "assistant-old": {"id":"assistant-old","parent":"user-1","children":[],"message":{"id":"old-message","author":{"role":"assistant"},"create_time":1710000003,"content":{"content_type":"text","parts":["Discarded regenerated answer"]},"metadata":{"model_slug":"gpt-old"}}},
+      "assistant-current": {"id":"assistant-current","parent":"user-1","children":["internal"],"message":{"id":"answer-message","author":{"role":"assistant"},"create_time":1710000004.5,"content":{"content_type":"text","parts":["Canonical answer"]},"metadata":{"model_slug":"gpt-4o"}}},
+      "internal": {"id":"internal","parent":"assistant-current","children":[],"message":null}
+    }
+  },
+  {
+    "id": "chatgpt-conversation-2",
+    "title": "Fallback branch",
+    "mapping": {
+      "root": {"parent":null,"children":["u"],"message":null},
+      "u": {"parent":"root","children":["a","z"],"message":{"author":{"role":"user"},"content":{"content_type":"text","parts":["Question"]}}},
+      "a": {"parent":"u","children":[],"message":{"author":{"role":"assistant"},"content":{"content_type":"text","parts":["Branch A"]},"metadata":{"model_slug":"gpt-a"}}},
+      "z": {"parent":"u","children":[],"message":{"author":{"role":"assistant"},"content":{"content_type":"text","parts":["Deterministic branch Z"]},"metadata":{"model_slug":"gpt-z"}}}
+    }
+  }
+]

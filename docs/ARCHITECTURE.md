@@ -28,6 +28,8 @@ Next.js is a presentation/BFF-free client for the MVP; authorization and domain 
 
 Each module contains `domain`, `application`, and `adapter` packages as needed. Domain code is plain Java. Public application ports/DTOs form module APIs; internal repositories and provider SDK types are not exported. Synchronous calls are used when a caller needs an immediate result; committed domain events trigger projections/jobs.
 
+Conversation source adapters are an ingestion boundary. Generic Conversation JSON and ChatGPT official `conversations.json` importers produce only provider-neutral `NormalizedConversation` values and enter the shared `ConversationImportService -> ConversationIngestionService -> PostgreSQL` path. Provider mapping/tree types do not enter conversation persistence. The ChatGPT canonical-branch contract is documented in [ChatGPT official export import](CHATGPT_EXPORT_IMPORT.md).
+
 ```mermaid
 flowchart TD
   USER["user"]
