@@ -16,6 +16,8 @@ and returns `text/event-stream`. The provider-neutral SSE sequence is `started`,
 `delta`, then `completed`; completed data includes the persisted assistant message ID, provider,
 and model. Errors detected before streaming use Problem Details. A provider failure after streaming
 begins emits an `error` event with a stable sanitized code/message and terminates the stream.
+If the SSE client disconnects, the server stops attempting delivery while allowing an already
+running provider stream to finish and persist its successful assistant response.
 
 The user message is committed before provider execution. Deltas are not database rows. On normal
 completion their text is aggregated into one assistant message; on failure the user message stays

@@ -66,14 +66,15 @@ public final class NativeGenerationService {
             String providerId, GenerationStream providerStream,
             Consumer<GenerationEvent> sink) {
         var state = new StreamState();
+        var observer = new EventObserver(sink);
         try {
-            providerStream.consume(event -> acceptProviderEvent(event, state, sink, providerId, model));
+            providerStream.consume(event -> acceptProviderEvent(event, state, observer, providerId, model));
         } catch (InvalidGenerationStreamException exception) {
             throw exception;
         } catch (RuntimeException exception) {
             if (state.terminal)
                 throw new InvalidGenerationStreamException("provider failed after a terminal event");
-            sink.accept(new GenerationEvent.Failed("PROVIDER_FAILURE", "Model generation failed"));
+            observer.notify(new GenerationEvent.Failed("PROVIDER_FAILURE", "Model generation failed"));
             return;
         }
         if (!state.terminal) throw new InvalidGenerationStreamException("provider stream ended without a terminal event");
@@ -81,10 +82,10 @@ public final class NativeGenerationService {
         var assistant = conversations.appendMessage(workspaceId, conversationId, MessageRole.ASSISTANT,
                 List.of(new TextContentPart(state.text.toString())),
                 new GenerationMetadata(providerId, model));
-        sink.accept(new GenerationEvent.Completed(providerId, model, assistant.id()));
+        observer.notify(new GenerationEvent.Completed(providerId, model, assistant.id()));
     }
 
-    private void acceptProviderEvent(GenerationEvent event, StreamState state, Consumer<GenerationEvent> sink,
+    private void acceptProviderEvent(GenerationEvent event, StreamState state, EventObserver observer,
             String providerId, String model) {
         Objects.requireNonNull(event, "provider event");
         if (state.terminal) throw new InvalidGenerationStreamException("event emitted after terminal event");
@@ -93,11 +94,11 @@ public final class NativeGenerationService {
             if (!providerId.equals(started.provider()) || !model.equals(started.model()))
                 throw new InvalidGenerationStreamException("STARTED provider/model does not match the request");
             state.started = true;
-            sink.accept(started);
+            observer.notify(started);
         } else if (event instanceof GenerationEvent.TextDelta delta) {
             if (!state.started) throw new InvalidGenerationStreamException("TEXT_DELTA emitted before STARTED");
             state.text.append(delta.text());
-            sink.accept(delta);
+            observer.notify(delta);
         } else if (event instanceof GenerationEvent.Completed completed) {
             if (!state.started) throw new InvalidGenerationStreamException("COMPLETED emitted before STARTED");
             if (!providerId.equals(completed.provider()) || !model.equals(completed.model()))
@@ -107,7 +108,7 @@ public final class NativeGenerationService {
         } else if (event instanceof GenerationEvent.Failed failed) {
             state.terminal = true;
             state.failed = true;
-            sink.accept(failed);
+            observer.notify(failed);
         }
     }
 
@@ -132,5 +133,24 @@ public final class NativeGenerationService {
         boolean started;
         boolean terminal;
         boolean failed;
+    }
+
+    /** Observer delivery is best-effort and cannot control provider execution or persistence. */
+    private static final class EventObserver {
+        private final Consumer<GenerationEvent> delegate;
+        private boolean available = true;
+
+        private EventObserver(Consumer<GenerationEvent> delegate) {
+            this.delegate = Objects.requireNonNull(delegate, "event observer");
+        }
+
+        private void notify(GenerationEvent event) {
+            if (!available) return;
+            try {
+                delegate.accept(event);
+            } catch (RuntimeException exception) {
+                available = false;
+            }
+        }
     }
 }

@@ -84,6 +84,57 @@ class NativeGenerationServiceTest {
     }
 
     @Test
+    void observerFailureDuringTextDeltaDoesNotPreventAssistantPersistence() {
+        var fixture = successfulFixture(provider(null, false));
+        var observed = new ArrayList<GenerationEvent>();
+
+        fixture.service().generateTurn(workspace, conversation, "fake", "fake-model",
+                List.of(new TextContentPart("Hello"))).consume(event -> {
+                    observed.add(event);
+                    if (event instanceof GenerationEvent.TextDelta) throw new IllegalStateException("disconnected");
+                });
+
+        assertThat(observed).containsExactly(new GenerationEvent.Started("fake", "fake-model"),
+                new GenerationEvent.TextDelta("Fake "));
+        verify(fixture.conversations()).appendMessage(workspace, conversation, MessageRole.ASSISTANT,
+                List.of(new TextContentPart("Fake response")), new GenerationMetadata("fake", "fake-model"));
+    }
+
+    @Test
+    void observerFailureDuringStartedDoesNotPreventAssistantPersistence() {
+        var fixture = successfulFixture(provider(null, false));
+        var observed = new ArrayList<GenerationEvent>();
+
+        fixture.service().generateTurn(workspace, conversation, "fake", "fake-model",
+                List.of(new TextContentPart("Hello"))).consume(event -> {
+                    observed.add(event);
+                    throw new IllegalStateException("disconnected");
+                });
+
+        assertThat(observed).containsExactly(new GenerationEvent.Started("fake", "fake-model"));
+        verify(fixture.conversations()).appendMessage(workspace, conversation, MessageRole.ASSISTANT,
+                List.of(new TextContentPart("Fake response")), new GenerationMetadata("fake", "fake-model"));
+    }
+
+    @Test
+    void invalidProviderEventOrderingDoesNotPersistAssistant() {
+        ModelProvider invalid = new ModelProvider() {
+            public String providerId() { return "fake"; }
+            public io.contextmesh.provider.application.GenerationStream generate(ModelGenerationRequest request) {
+                return sink -> sink.accept(new GenerationEvent.TextDelta("out of order"));
+            }
+        };
+        var fixture = successfulFixture(invalid);
+
+        assertThatThrownBy(() -> fixture.service().generateTurn(workspace, conversation, "fake", "fake-model",
+                List.of(new TextContentPart("Hello"))).consume(event -> {}))
+                .isInstanceOf(InvalidGenerationStreamException.class)
+                .hasMessage("TEXT_DELTA emitted before STARTED");
+        verify(fixture.conversations(), org.mockito.Mockito.never()).appendMessage(eq(workspace), eq(conversation),
+                eq(MessageRole.ASSISTANT), any(), any());
+    }
+
+    @Test
     void rejectsImportedConversationAndEmptyInput() {
         var conversations = mock(NativeConversationService.class);
         when(conversations.getConversation(workspace, conversation))
@@ -112,6 +163,24 @@ class NativeGenerationServiceTest {
             }
         };
     }
+
+    private Fixture successfulFixture(ModelProvider provider) {
+        var conversations = mock(NativeConversationService.class);
+        var empty = view(ConversationSourceType.NATIVE_CONVERSATION, List.of());
+        var user = message(UUID.randomUUID(), "user", 0, MessageRole.USER, "Hello", null, null);
+        var assistant = message(UUID.randomUUID(), "assistant", 1, MessageRole.ASSISTANT,
+                "Fake response", "user", new GenerationMetadata("fake", "fake-model"));
+        when(conversations.getConversation(workspace, conversation)).thenReturn(empty, empty,
+                view(ConversationSourceType.NATIVE_CONVERSATION, List.of(user)));
+        when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.USER), any(), eq(null)))
+                .thenReturn(user);
+        when(conversations.appendMessage(eq(workspace), eq(conversation), eq(MessageRole.ASSISTANT), any(),
+                eq(new GenerationMetadata("fake", "fake-model")))).thenReturn(assistant);
+        return new Fixture(new NativeGenerationService(conversations,
+                new ModelProviderRegistry(List.of(provider))), conversations);
+    }
+
+    private record Fixture(NativeGenerationService service, NativeConversationService conversations) {}
 
     private ConversationView view(ConversationSourceType type, List<ConversationView.MessageView> messages) {
         return new ConversationView(conversation, workspace, type, null, null, null, null, null,

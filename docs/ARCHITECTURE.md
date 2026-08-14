@@ -59,6 +59,11 @@ provider and requested model. A small in-process striped guard serializes turns 
 conversation in one server process; distributed turn coordination is intentionally deferred.
 No PostgreSQL transaction or row lock spans provider execution.
 
+Event observation is best-effort and separate from provider stream validation. In particular, an
+SSE send failure disables further delivery attempts but does not interrupt provider consumption or
+assistant persistence. Provider exceptions and invalid provider event ordering still terminate the
+generation lifecycle and never persist an assistant message.
+
 For v1, the provider request context is simply the ordered native conversation history after the
 new user message. Later, Context Sources and Context Assembly can produce a ContextPacket and map
 that packet into the same provider-neutral request. Imported conversations cannot be generated

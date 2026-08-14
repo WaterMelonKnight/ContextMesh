@@ -77,26 +77,41 @@ public final class NativeConversationController {
         var stream = generationService.generateTurn(workspaceId, conversationId,
                 request.provider(), request.model(), content);
         var emitter = new SseEmitter(0L);
+        var delivery = new SseDelivery(emitter);
         Thread.startVirtualThread(() -> {
             try {
-                stream.consume(event -> send(emitter, event));
-                emitter.complete();
+                stream.consume(delivery::send);
             } catch (RuntimeException exception) {
-                send(emitter, new GenerationEvent.Failed("GENERATION_ERROR", "Generation could not be completed"));
-                emitter.complete();
+                delivery.send(new GenerationEvent.Failed("GENERATION_ERROR", "Generation could not be completed"));
+            } finally {
+                delivery.complete();
             }
         });
         return emitter;
     }
 
-    private static void send(SseEmitter emitter, GenerationEvent event) {
-        try {
-            String name = event instanceof GenerationEvent.Started ? "started"
-                    : event instanceof GenerationEvent.TextDelta ? "delta"
-                    : event instanceof GenerationEvent.Completed ? "completed" : "error";
-            emitter.send(SseEmitter.event().name(name).data(event));
-        } catch (java.io.IOException exception) {
-            throw new IllegalStateException("generation stream client disconnected", exception);
+    private static final class SseDelivery {
+        private final SseEmitter emitter;
+        private boolean available = true;
+
+        private SseDelivery(SseEmitter emitter) { this.emitter = emitter; }
+
+        private void send(GenerationEvent event) {
+            if (!available) return;
+            try {
+                String name = event instanceof GenerationEvent.Started ? "started"
+                        : event instanceof GenerationEvent.TextDelta ? "delta"
+                        : event instanceof GenerationEvent.Completed ? "completed" : "error";
+                emitter.send(SseEmitter.event().name(name).data(event));
+            } catch (java.io.IOException | IllegalStateException exception) {
+                available = false;
+            }
+        }
+
+        private void complete() {
+            if (!available) return;
+            available = false;
+            emitter.complete();
         }
     }
 
