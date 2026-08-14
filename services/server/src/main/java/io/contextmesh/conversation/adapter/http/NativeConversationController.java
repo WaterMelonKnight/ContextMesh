@@ -99,9 +99,12 @@ public final class NativeConversationController {
         private void send(GenerationEvent event) {
             if (!available) return;
             try {
-                String name = event instanceof GenerationEvent.Started ? "started"
-                        : event instanceof GenerationEvent.TextDelta ? "delta"
-                        : event instanceof GenerationEvent.Completed ? "completed" : "error";
+                String name = switch (event) {
+                    case GenerationEvent.Started ignored -> "started";
+                    case GenerationEvent.TextDelta ignored -> "delta";
+                    case GenerationEvent.Completed ignored -> "completed";
+                    case GenerationEvent.Failed ignored -> "failed";
+                };
                 emitter.send(SseEmitter.event().name(name).data(event));
             } catch (java.io.IOException | IllegalStateException exception) {
                 available = false;

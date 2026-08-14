@@ -6,6 +6,10 @@ not accepted as authoritative client metadata for a generated turn. Streaming de
 or partial assistant output are intentionally not persisted, so this slice requires no schema
 migration or generation table.
 
+For OpenAI-compatible turns these columns contain the stable ContextMesh provider ID
+`openai-compatible` and the request-selected model. They do not infer or claim the endpoint vendor.
+Runtime configuration and credentials are not persisted in the conversation or message model.
+
 ## Principles
 
 PostgreSQL is the source of truth. UUIDv7 (or application-generated time-sortable UUIDs) are primary keys. Every user-owned row carries `workspace_id`; uniqueness is scoped by it. Timestamps are UTC `timestamptz`. Original normalized messages and extraction results are immutable except for deletion. Derived “current” projections are rebuildable from versioned assertions and history.
