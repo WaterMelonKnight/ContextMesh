@@ -30,6 +30,21 @@ Each module contains `domain`, `application`, and `adapter` packages as needed. 
 
 Conversation source adapters are an ingestion boundary. Generic Conversation JSON and ChatGPT official `conversations.json` importers produce only provider-neutral `NormalizedConversation` values and enter the shared `ConversationImportService -> ConversationIngestionService -> PostgreSQL` path. Provider mapping/tree types do not enter conversation persistence. The ChatGPT canonical-branch contract is documented in [ChatGPT official export import](CHATGPT_EXPORT_IMPORT.md).
 
+Native Talk has a separate, append-oriented application boundary. `NativeConversationService`
+creates ContextMesh-owned conversations and appends messages atomically; it never reconstructs a
+conversation or invokes import duplicate/conflict handling. `ConversationQueryPort` supplies one
+workspace-scoped read model for both source kinds. Imported conversations remain immutable through
+this boundary.
+
+```mermaid
+flowchart LR
+  SOURCE["Imported source"] --> NORMALIZE["import and normalize"]
+  NORMALIZE --> IMPORTED["immutable imported conversation"]
+  TALK["Native Talk"] --> CREATE["create native conversation"]
+  CREATE --> APPEND["append native messages"]
+  IMPORTED -. "future context assembly" .-> CREATE
+```
+
 ```mermaid
 flowchart TD
   USER["user"]

@@ -38,6 +38,29 @@ Returns status (`QUEUED`, `NORMALIZING`, `EXTRACTING`, `COMPLETED`, `PARTIAL`, `
 
 ## Conversations
 
+### Native Talk lifecycle
+
+`POST /api/v1/workspaces/{workspaceId}/conversations` creates a native conversation and returns
+`201 Created`. The JSON body is `{ "title": "Optional title" }`; the returned conversation has
+`sourceType: "NATIVE_CONVERSATION"`, ContextMesh identity, timestamps, metadata, and an empty
+`messages` array.
+
+`POST /api/v1/workspaces/{workspaceId}/conversations/{conversationId}/messages` appends one native
+message and returns `201 Created`. Its body contains `role`, a non-empty array of `{ "type":
+"TEXT", "text": "..." }` parts, and optional `generation: { "provider": "...", "model": "..." }`.
+The result includes the stable ID, zero-based `sequenceNo`, parent stable ID, content, timestamps,
+and generation metadata. Imported targets return `409`; missing or cross-workspace targets return
+`404`; invalid enums/content return Problem Details with `400`.
+
+`GET /api/v1/workspaces/{workspaceId}/conversations/{conversationId}` returns the common header and
+all messages ordered by sequence for either an imported or native conversation. This first Native
+Talk slice intentionally returns the bounded conversation aggregate; pagination can be added when
+measured conversation sizes require it.
+
+Imported history cannot be extended through the native append API. A future continuation flow will
+assemble selected imported conversation/graph/project context into a **new** native conversation;
+that context assembly is not part of this API slice.
+
 - `GET /conversations?query=&provider=&topicId=&projectId=&from=&to=&cursor=&limit=` returns summary cards, detected entity chips, and extraction status.
 - `GET /conversations/{id}` returns header/source metadata and derived links, not all messages.
 - `GET /conversations/{id}/messages?cursor=&limit=` returns ordered messages with role/time and stable evidence anchors.
