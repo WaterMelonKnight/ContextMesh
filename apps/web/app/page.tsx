@@ -1,36 +1,15 @@
 "use client";
-
-import { useEffect, useState } from "react";
-
-type Health = { status: string; application: string; database: string };
-
+import { useCallback, useEffect, useState } from "react";
+import { api } from "../lib/api";
+import type { Conversation, ConversationSummary, Message } from "../lib/types";
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"}/api/v1/health`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("Backend unavailable");
-        return response.json() as Promise<Health>;
-      })
-      .then(setHealth)
-      .catch(() => setHealth(null));
-    return () => controller.abort();
-  }, []);
-
-  return (
-    <main>
-      <section>
-        <p className="eyebrow">Development foundation</p>
-        <h1>ContextMesh</h1>
-        <p className="tagline">Turn AI conversations into evolving context.</p>
-        <dl>
-          <div><dt>Backend</dt><dd data-up={health?.status === "UP"}>{health?.status === "UP" ? "healthy" : "unavailable"}</dd></div>
-          <div><dt>Database</dt><dd data-up={health?.database === "UP"}>{health?.database === "UP" ? "healthy" : "unavailable"}</dd></div>
-        </dl>
-      </section>
-    </main>
-  );
+  const [workspace, setWorkspace] = useState(""); const [items, setItems] = useState<ConversationSummary[]>([]); const [selected, setSelected] = useState<Conversation | null>(null); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [stream, setStream] = useState(""); const [generating, setGenerating] = useState(false);
+  const refresh = useCallback(async (id = workspace) => { if (id) setItems(await api.list(id)); }, [workspace]);
+  const open = useCallback(async (id: string) => { if (workspace) { setSelected(await api.get(workspace, id)); setStream(""); } }, [workspace]);
+  useEffect(() => { api.bootstrap().then(async value => { setWorkspace(value.id); await refresh(value.id); }).catch(reason => setError(reason instanceof Error ? reason.message : "Backend unavailable")); }, [refresh]);
+  async function importFile(file: File) { try { setError(""); const result = await api.importChatGpt(workspace, await file.text()); setNotice(`Imported ${result.importedCount}; skipped ${result.skippedDuplicateCount}.`); await refresh(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Import failed"); } }
+  async function continueFrom(message?: Message) { if (!selected) return; try { const result = await api.continue(workspace, selected.id, message?.id); await refresh(); setSelected(result.conversation); setNotice("Native continuation created."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Continuation failed"); } }
+  async function send(provider: string, model: string, content: string) { if (!selected) return; setGenerating(true); setStream(""); setError(""); try { await api.turn(workspace, selected.id, provider, model, content, ({ event, data }) => { if (event === "delta") setStream(value => value + ((data as { text?: string }).text ?? "")); if (event === "failed") setError("Generation could not be completed."); }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Generation failed"); } finally { setGenerating(false); await open(selected.id); await refresh(); } }
+  return <main className="shell"><aside><header><p className="eyebrow">Local MVP</p><h1>ContextMesh</h1><small>{workspace ? `Workspace ${workspace.slice(0, 8)}…` : "Connecting…"}</small></header><label className="import">Import ChatGPT JSON<input type="file" accept="application/json,.json" disabled={!workspace} onChange={event => { const file = event.target.files?.[0]; if (file) void importFile(file); }} /></label><h2>Conversations</h2><nav>{items.map(item => <button className={selected?.id === item.id ? "active" : ""} key={item.id} onClick={() => void open(item.id)}><strong>{item.title || "Untitled"}</strong><span>{item.sourceType === "IMPORTED_CONVERSATION" ? item.sourceProvider || "Imported" : item.origin ? "Continuation" : "Native"}</span></button>)}</nav></aside><section className="detail">{error && <p className="alert error">{error}</p>}{notice && <p className="alert">{notice}</p>}{!selected ? <div className="empty"><h2>Import or choose a conversation</h2><p>Your database remains the source of truth.</p></div> : <><div className="detailHeader"><div><p className="eyebrow">{selected.sourceType === "IMPORTED_CONVERSATION" ? `Imported · ${selected.sourceProvider}` : "Native conversation"}</p><h2>{selected.title || "Untitled"}</h2></div>{selected.sourceType === "IMPORTED_CONVERSATION" && <button onClick={() => void continueFrom()}>Continue full conversation</button>}</div><div className="messages">{selected.messages.map(message => <article key={message.id} className={message.role.toLowerCase()}><div><b>{message.role}</b>{selected.sourceType === "IMPORTED_CONVERSATION" && <button className="link" onClick={() => void continueFrom(message)}>Continue from here</button>}</div>{message.content.map((part, index) => <p key={index}>{part.text}</p>)}</article>)}{generating && <article className="assistant streaming"><div><b>ASSISTANT</b><span> streaming</span></div><p>{stream || "…"}</p></article>}</div>{selected.sourceType === "NATIVE_CONVERSATION" && <Composer disabled={generating} onSend={send} />}</>}</section></main>;
 }
-
+function Composer({ disabled, onSend }: { disabled: boolean; onSend: (provider: string, model: string, content: string) => Promise<void> }) { const [provider, setProvider] = useState("fake"); const [model, setModel] = useState("fake-model"); const [content, setContent] = useState(""); return <form className="composer" onSubmit={event => { event.preventDefault(); if (content.trim()) void onSend(provider, model, content).then(() => setContent("")); }}><div><label>Provider<input value={provider} onChange={e => setProvider(e.target.value)} /></label><label>Model<input value={model} onChange={e => setModel(e.target.value)} /></label></div><textarea aria-label="Message" placeholder="Continue the conversation…" value={content} onChange={e => setContent(e.target.value)} /><button disabled={disabled || !content.trim()}>{disabled ? "Generating…" : "Send"}</button></form>; }

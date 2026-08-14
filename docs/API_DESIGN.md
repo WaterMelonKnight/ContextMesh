@@ -181,3 +181,9 @@ If evidence is insufficient, status still completes with an explicit not-found a
 ## API evolution
 
 OpenAPI is generated/checked in CI once server scaffolding exists. Additive fields are allowed; clients ignore unknown fields. Breaking changes require `/v2` or an explicit compatibility plan. Internal extraction payloads are not exposed as stable public APIs.
+
+### `GET /api/v1/workspaces/{workspaceId}/conversations`
+
+Returns at most 100 lightweight workspace-isolated conversation summaries ordered by `updatedAt`
+descending with conversation UUID as a stable tie-breaker. Summaries include source identity, timestamps,
+title, and continuation origin when present, but never message bodies.

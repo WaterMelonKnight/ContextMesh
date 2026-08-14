@@ -76,6 +76,12 @@ public final class NativeConversationController {
         return service.getConversation(workspaceId, conversationId);
     }
 
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<io.contextmesh.conversation.application.ConversationSummary> list(
+            @PathVariable UUID workspaceId) {
+        return service.listConversations(workspaceId);
+    }
+
     @PostMapping(value = "/{conversationId}/turns", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter turn(@PathVariable UUID workspaceId, @PathVariable UUID conversationId,
