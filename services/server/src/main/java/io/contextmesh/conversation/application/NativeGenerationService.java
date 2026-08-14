@@ -23,10 +23,13 @@ public final class NativeGenerationService {
 
     private final NativeConversationService conversations;
     private final ModelProviderRegistry providers;
+    private final ContinuationContextResolver continuationContext;
 
-    public NativeGenerationService(NativeConversationService conversations, ModelProviderRegistry providers) {
+    public NativeGenerationService(NativeConversationService conversations, ModelProviderRegistry providers,
+            ContinuationContextResolver continuationContext) {
         this.conversations = conversations;
         this.providers = providers;
+        this.continuationContext = continuationContext;
     }
 
     public GenerationStream generateTurn(UUID workspaceId, UUID conversationId, String providerId,
@@ -56,10 +59,15 @@ public final class NativeGenerationService {
         var before = conversations.getConversation(workspaceId, conversationId);
         if (before.sourceType() != ConversationSourceType.NATIVE_CONVERSATION)
             throw new ImportedConversationImmutableException();
+        // Validate source context before committing the new USER message. Unsupported imported
+        // roles or content therefore fail deterministically without invoking a provider or write.
+        var imported = continuationContext.resolve(workspaceId, conversationId).stream()
+                .map(this::modelMessage).toList();
         conversations.appendMessage(workspaceId, conversationId, MessageRole.USER, content, null);
         var after = conversations.getConversation(workspaceId, conversationId);
-        return new ModelGenerationRequest(workspaceId, conversationId, model,
-                after.messages().stream().map(this::modelMessage).toList());
+        var messages = new java.util.ArrayList<ModelMessage>(imported);
+        after.messages().stream().map(this::modelMessage).forEach(messages::add);
+        return new ModelGenerationRequest(workspaceId, conversationId, model, messages);
     }
 
     private void runTurn(UUID workspaceId, UUID conversationId, String model,

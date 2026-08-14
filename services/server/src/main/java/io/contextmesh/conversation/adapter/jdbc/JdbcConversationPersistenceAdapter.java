@@ -6,6 +6,8 @@ import io.contextmesh.conversation.application.ConversationPersistencePort;
 import io.contextmesh.conversation.application.ConversationQueryPort;
 import io.contextmesh.conversation.application.ConversationView;
 import io.contextmesh.conversation.application.ConversationNotFoundException;
+import io.contextmesh.conversation.application.ContinuationOrigin;
+import io.contextmesh.conversation.application.ContinuationPersistencePort;
 import io.contextmesh.conversation.application.ImportedConversationImmutableException;
 import io.contextmesh.conversation.application.NativeConversationPersistencePort;
 import io.contextmesh.conversation.domain.ConversationSourceType;
@@ -28,7 +30,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class JdbcConversationPersistenceAdapter implements ConversationPersistencePort,
-        NativeConversationPersistencePort, ConversationQueryPort {
+        NativeConversationPersistencePort, ConversationQueryPort, ContinuationPersistencePort {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
@@ -113,6 +115,28 @@ public class JdbcConversationPersistenceAdapter implements ConversationPersisten
                   (id, workspace_id, source_type, title, metadata, created_at, updated_at)
                 values (?, ?, 'NATIVE_CONVERSATION', ?, '{}'::jsonb, ?, ?)
                 """, conversationId, workspaceId, title, timestamp(now), timestamp(now));
+    }
+
+    @Override
+    public void create(UUID workspaceId, UUID targetConversationId, UUID sourceConversationId,
+            UUID throughMessageId, Instant createdAt) {
+        jdbc.update("""
+                insert into conversation_continuations
+                  (target_conversation_id, workspace_id, source_conversation_id, through_message_id, created_at)
+                values (?, ?, ?, ?, ?)
+                """, targetConversationId, workspaceId, sourceConversationId, throughMessageId,
+                timestamp(createdAt));
+    }
+
+    @Override
+    public Optional<ContinuationOrigin> findOrigin(UUID workspaceId, UUID targetConversationId) {
+        return Optional.ofNullable(DataAccessUtils.singleResult(jdbc.query("""
+                select source_conversation_id, through_message_id from conversation_continuations
+                where workspace_id = ? and target_conversation_id = ?
+                """, (rs, row) -> new ContinuationOrigin(
+                        rs.getObject("source_conversation_id", UUID.class),
+                        rs.getObject("through_message_id", UUID.class)),
+                workspaceId, targetConversationId)));
     }
 
     @Override

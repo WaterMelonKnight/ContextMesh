@@ -29,5 +29,6 @@ class DatabaseIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from workspaces", Integer.class)).isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from conversations", Integer.class)).isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from messages", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from conversation_continuations", Integer.class)).isZero();
     }
 }

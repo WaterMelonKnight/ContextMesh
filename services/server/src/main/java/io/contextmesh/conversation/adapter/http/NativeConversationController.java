@@ -1,6 +1,8 @@
 package io.contextmesh.conversation.adapter.http;
 
 import io.contextmesh.conversation.application.ConversationView;
+import io.contextmesh.conversation.application.ContinuationResult;
+import io.contextmesh.conversation.application.ConversationContinuationService;
 import io.contextmesh.conversation.application.NativeConversationService;
 import io.contextmesh.conversation.application.NativeGenerationService;
 import io.contextmesh.provider.application.GenerationEvent;
@@ -27,11 +29,22 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public final class NativeConversationController {
     private final NativeConversationService service;
     private final NativeGenerationService generationService;
+    private final ConversationContinuationService continuationService;
 
     public NativeConversationController(NativeConversationService service,
-            NativeGenerationService generationService) {
+            NativeGenerationService generationService, ConversationContinuationService continuationService) {
         this.service = service;
         this.generationService = generationService;
+        this.continuationService = continuationService;
+    }
+
+    @PostMapping(value = "/{sourceConversationId}/continuations",
+            consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ContinuationResult continueConversation(@PathVariable UUID workspaceId,
+            @PathVariable UUID sourceConversationId, @RequestBody(required = false) ContinuationRequest request) {
+        return continuationService.create(workspaceId, sourceConversationId,
+                request == null ? null : request.throughMessageId(), request == null ? null : request.title());
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -124,4 +137,5 @@ public final class NativeConversationController {
     public record ContentPartRequest(ContentPartType type, String text) {}
     public record GenerationRequest(String provider, String model) {}
     public record TurnRequest(String provider, String model, List<ContentPartRequest> content) {}
+    public record ContinuationRequest(UUID throughMessageId, String title) {}
 }

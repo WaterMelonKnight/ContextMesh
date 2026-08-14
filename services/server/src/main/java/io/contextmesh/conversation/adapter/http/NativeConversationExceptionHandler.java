@@ -2,6 +2,7 @@ package io.contextmesh.conversation.adapter.http;
 
 import io.contextmesh.conversation.application.ConversationNotFoundException;
 import io.contextmesh.conversation.application.ImportedConversationImmutableException;
+import io.contextmesh.conversation.application.InvalidContinuationSourceException;
 import io.contextmesh.provider.application.UnknownModelProviderException;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,12 @@ public final class NativeConversationExceptionHandler {
     ProblemDetail immutable(ImportedConversationImmutableException exception) {
         return problem(HttpStatus.CONFLICT, "Imported Conversation Is Immutable", exception.getMessage(),
                 "imported-conversation-immutable");
+    }
+
+    @ExceptionHandler(InvalidContinuationSourceException.class)
+    ProblemDetail invalidSource(InvalidContinuationSourceException exception) {
+        return problem(HttpStatus.CONFLICT, "Invalid Continuation Source", exception.getMessage(),
+                "invalid-continuation-source");
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class})
