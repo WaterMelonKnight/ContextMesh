@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public final class StoredContinuationContextResolver implements ContinuationContextResolver {
+public class StoredContinuationContextResolver implements ContinuationContextResolver {
     private final ContinuationPersistencePort continuations;
     private final ConversationQueryPort conversations;
 
