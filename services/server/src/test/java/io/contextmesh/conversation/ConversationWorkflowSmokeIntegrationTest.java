@@ -128,7 +128,7 @@ class ConversationWorkflowSmokeIntegrationTest {
 
         assertThat(provider.requests).hasSize(1);
         assertThat(provider.requests.getFirst().messages())
-                .extracting(ModelMessage::content)
+                .extracting(ModelMessage::text)
                 .containsExactly("You are helpful.", "What is ContextMesh?",
                         "ContextMesh preserves context across conversations.",
                         "Continue from that point.")
