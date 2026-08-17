@@ -2,7 +2,7 @@
 
 ContextMesh converts AI conversations and future agent activity into **evolving, evidence-backed state**. It is not a general chat client: the product goal is to reconstruct topics, projects, decisions, and changes while preserving the path back to original evidence.
 
-> **Status — Phase 0:** the runnable development foundation is implemented. Product functionality such as importing conversations, extraction, graphs, projects, and Ask My Context remains planned and is not available yet.
+> **Status — Local conversation MVP:** ChatGPT JSON import, immutable imported history, native continuations, and provider-neutral streaming chat are usable in the browser. Context graphs and extraction remain planned.
 
 ## Implemented now
 
@@ -38,7 +38,7 @@ Start the backend in a second terminal:
 
 ```bash
 cd services/server
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 To enable a trusted OpenAI-compatible endpoint, configure it before starting the backend. No
@@ -69,6 +69,19 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
 Development database defaults are `contextmesh` for database, user, and password on port `5432`. Override Compose with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`; configure the server with `DATABASE_URL`, `DATABASE_USER`, and `DATABASE_PASSWORD`. These defaults are local-only and are not production secrets.
+
+### Verify the browser workflow
+
+The `dev` Spring profile enables a localhost-only CORS policy and `GET /api/v1/development/workspace`. The endpoint idempotently creates and returns the deterministic local development workspace; the browser calls it automatically. It is absent outside the `dev` profile.
+
+1. Open <http://localhost:3000>.
+2. Choose **Import ChatGPT JSON** and select a real `conversations.json` export (the browser sends its JSON contents, never its path).
+3. Select the imported conversation and inspect its ordered messages.
+4. Choose **Continue full conversation** or **Continue from here** beside a message.
+5. In the new native conversation, use `fake` / `fake-model` for the built-in deterministic local provider, or `openai-compatible` and the server-configured model.
+6. Send a message and observe the incremental assistant response. Reopen or refresh the conversation to confirm PostgreSQL persistence.
+
+Provider API keys remain backend environment configuration and are never entered in or returned to the browser. The local bootstrap and CORS support are development-only; authentication and production workspace selection are intentionally deferred.
 
 ## Checks
 

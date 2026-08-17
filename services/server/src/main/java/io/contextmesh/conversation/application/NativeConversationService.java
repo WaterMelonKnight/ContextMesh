@@ -59,4 +59,10 @@ public class NativeConversationService {
     public ConversationView getConversation(UUID workspaceId, UUID conversationId) {
         return queries.find(workspaceId, conversationId).orElseThrow(ConversationNotFoundException::new);
     }
+
+    @Transactional(readOnly = true)
+    public List<ConversationSummary> listConversations(UUID workspaceId) {
+        Objects.requireNonNull(workspaceId, "workspaceId");
+        return queries.list(workspaceId, 100);
+    }
 }

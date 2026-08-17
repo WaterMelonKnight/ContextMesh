@@ -6,6 +6,7 @@ import io.contextmesh.conversation.application.ConversationPersistencePort;
 import io.contextmesh.conversation.application.ConversationQueryPort;
 import io.contextmesh.conversation.application.ConversationView;
 import io.contextmesh.conversation.application.ConversationNotFoundException;
+import io.contextmesh.conversation.application.ConversationSummary;
 import io.contextmesh.conversation.application.ContinuationOrigin;
 import io.contextmesh.conversation.application.ContinuationPersistencePort;
 import io.contextmesh.conversation.application.ImportedConversationImmutableException;
@@ -205,6 +206,28 @@ public class JdbcConversationPersistenceAdapter implements ConversationPersisten
         return Optional.of(new ConversationView(header.id(), header.workspaceId(), header.sourceType(),
                 header.sourceProvider(), header.externalId(), header.title(), header.sourceCreatedAt(),
                 header.sourceUpdatedAt(), header.createdAt(), header.updatedAt(), header.metadata(), messages));
+    }
+
+    @Override
+    public List<ConversationSummary> list(UUID workspaceId, int limit) {
+        return jdbc.query("""
+                select c.id, c.source_type, c.source_provider, c.title, c.created_at, c.updated_at,
+                       cc.source_conversation_id, cc.through_message_id
+                from conversations c
+                left join conversation_continuations cc
+                  on cc.workspace_id = c.workspace_id and cc.target_conversation_id = c.id
+                where c.workspace_id = ?
+                order by c.updated_at desc, c.id asc
+                limit ?
+                """, (rs, row) -> {
+                    UUID sourceId = rs.getObject("source_conversation_id", UUID.class);
+                    var origin = sourceId == null ? null : new ContinuationOrigin(sourceId,
+                            rs.getObject("through_message_id", UUID.class));
+                    return new ConversationSummary(rs.getObject("id", UUID.class),
+                            ConversationSourceType.valueOf(rs.getString("source_type")),
+                            rs.getString("source_provider"), rs.getString("title"),
+                            instant(rs.getTimestamp("created_at")), instant(rs.getTimestamp("updated_at")), origin);
+                }, workspaceId, limit);
     }
 
     private String contentJson(io.contextmesh.conversation.domain.NormalizedMessage message) {

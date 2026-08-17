@@ -94,6 +94,7 @@ class NativeConversationHttpIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.update("delete from messages");
+        jdbc.update("delete from conversation_continuations");
         jdbc.update("delete from conversations");
         jdbc.update("delete from workspaces");
         jdbc.update("delete from users");
@@ -103,6 +104,26 @@ class NativeConversationHttpIntegrationTest {
                 user, user + "@example.test", "Native test");
         jdbc.update("insert into workspaces(id, owner_user_id, name) values (?, ?, ?)",
                 workspaceId, user, "Native workspace");
+    }
+
+    @Test
+    void listsOnlyBoundedWorkspaceSummariesInDeterministicOrder() throws Exception {
+        UUID newest = service.createConversation(workspaceId, "Newest").id();
+        UUID otherUser = UUID.randomUUID(); UUID otherWorkspace = UUID.randomUUID();
+        jdbc.update("insert into users(id, email, display_name) values (?, ?, ?)",
+                otherUser, otherUser + "@example.test", "Other");
+        jdbc.update("insert into workspaces(id, owner_user_id, name) values (?, ?, ?)",
+                otherWorkspace, otherUser, "Other workspace");
+        jdbc.update("update conversations set updated_at = '2030-01-01' where id = ?", newest);
+        service.createConversation(otherWorkspace, "Private");
+        for (int index = 0; index < 105; index++) service.createConversation(workspaceId, "Item " + index);
+
+        String body = mvc.perform(get(base())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(100))
+                .andExpect(jsonPath("$[0].id").value(newest.toString()))
+                .andExpect(jsonPath("$[0].messages").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("Private");
     }
 
     @Test
