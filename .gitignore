@@ -1,9 +1,24 @@
+# IDE / editor
 .idea/
 .vscode/
 *.iml
-services/server/target/
-apps/web/.next/
-apps/web/node_modules/
-apps/web/.env.local
 .DS_Store
 
+# Local environment and secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Java / Maven
+target/
+# mvnw downloads its own Maven distribution here; the wrapper config itself stays tracked
+**/.mvn/apache-maven-*/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
