@@ -74,6 +74,10 @@ Decisions are accepted unless marked otherwise. Amend a decision with a new ADR;
 
 **Status:** Accepted. **Decision:** treat `Context Source` as a conceptual boundary whose first-class children include Conversation and, in a future slice, Agent Run. Preserve raw execution records as evidence/timeline detail and graph only meaningful concepts. Model native multi-provider output at a future Generation layer rather than binding Conversation to one model. **Why:** conversation import should stay simple without blocking agent histories, multi-agent parent/child runs, artifacts, or multi-model native conversations. **Consequences:** add no generic source table, agent module, Generation persistence, or orchestration now. Extend provenance through concrete source-specific references when an implemented slice proves their shape; every derived claim must still resolve to original source content/event.
 
+## ADR-019 — Development browser traffic is same-origin through a Next.js proxy
+
+**Status:** Accepted. **Decision:** the browser calls relative `/api/**` paths only; `next.config.mjs` rewrites them to a server-side `CONTEXTMESH_INTERNAL_API_ORIGIN` (default `http://127.0.0.1:8080`). No public backend origin is published to the browser, and the server carries no development CORS policy. **Why:** a second public origin forced every cloud IDE session to expose and configure the backend port and to maintain a matching server-side allow-list; a same-origin proxy removes both without weakening anything, because nothing cross-origin remains to permit. **Consequences:** the streaming turn endpoint must set `Cache-Control: no-cache, no-transform` so intermediaries do not gzip and buffer server-sent events; `CONTEXTMESH_INTERNAL_API_ORIGIN` must stay unprefixed by `NEXT_PUBLIC_` so it is never inlined into the browser bundle. A future non-proxied deployment topology would have to reintroduce an explicit, non-wildcard CORS policy.
+
 ## Important unresolved decisions
 
 1. **Initial model provider/model policy:** evaluate structured-schema reliability, cost, privacy terms, rate limits, and embedding availability with a fixed corpus.
