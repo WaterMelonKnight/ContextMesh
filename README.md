@@ -36,40 +36,44 @@ processes on exit. From the repository root, run:
 ./scripts/dev.sh
 ```
 
-Open <http://localhost:3000>. The local browser topology is:
+Open <http://localhost:3000>. Every browser API call is same-origin: Next.js rewrites `/api/**` to
+the backend, so the browser never needs a public Spring Boot hostname or port.
 
 ```text
-browser -> http://localhost:3000 -> Next.js
-browser -> http://localhost:8080 -> Spring Boot
+browser -> http://localhost:3000 -> Next.js -> /api/** rewrite -> http://127.0.0.1:8080 -> Spring Boot
 ```
 
-In a remote cloud IDE, give the launcher the two HTTPS proxy origins (with no path):
+In a remote cloud IDE, only the frontend needs a public HTTPS origin (with no path). The backend
+port does not have to be exposed at all:
 
 ```bash
-CONTEXTMESH_PUBLIC_WEB_ORIGIN=https://workspace--3000.example-cloud-ide.com \
-CONTEXTMESH_PUBLIC_API_ORIGIN=https://workspace--8080.example-cloud-ide.com \
-./scripts/dev.sh
+CONTEXTMESH_PUBLIC_WEB_ORIGIN=https://workspace--3000.example-cloud-ide.com ./scripts/dev.sh
 ```
 
 The remote browser topology is:
 
 ```text
-browser -> public :3000 HTTPS proxy -> Next.js
-browser -> public :8080 HTTPS proxy -> Spring Boot
+browser -> https://workspace--3000.example-cloud-ide.com -> Next.js -> /api/** rewrite -> http://127.0.0.1:8080 -> Spring Boot
 ```
 
 The launcher derives `CONTEXTMESH_DEV_ALLOWED_ORIGIN_HOST` from the public web URL for Next.js
-`allowedDevOrigins`; localhost remains allowed and arbitrary hosts are not. It exports
-`NEXT_PUBLIC_API_BASE_URL` as the public API origin because `localhost:8080` in a remote browser
-means the developer's computer, not the remote workspace. It also exports
-`CONTEXTMESH_DEV_ALLOWED_ORIGINS` for Spring's dev-profile-only CORS configuration. That setting
-accepts comma-separated origins when starting the server separately; it does not permit `*` and
-retains only `GET`/`POST` with `Content-Type`/`Accept` headers.
+`allowedDevOrigins`; localhost remains allowed and arbitrary hosts are not. Because the browser
+only ever talks to its own origin, no request to the API is cross-origin and the server carries no
+development CORS policy.
+
+Set `CONTEXTMESH_INTERNAL_API_ORIGIN` only when Spring Boot does not listen on
+`http://127.0.0.1:8080`. It is read by `next.config.mjs` on the server, is never exposed to the
+browser, and must be a bare HTTP(S) origin without a path, query, fragment, or credentials.
+
+Turn generation stays incremental through the proxy: the backend serves `text/event-stream` with
+`Cache-Control: no-cache, no-transform`, which stops the Next.js rewrite and any cloud IDE HTTPS
+proxy from gzipping — and therefore buffering — the deltas into a single burst at completion.
 
 The existing `compose.yaml` intentionally supplies PostgreSQL infrastructure only. The launcher
 uses it rather than adding invasive development containers for Maven and Next.js; Docker does not
-remove the browser public-URL or CORS requirements. PostgreSQL remains running after the launcher
-exits and can be stopped with `docker compose down` (add `-v` only to delete local database data).
+remove the browser public-URL requirement for the frontend. PostgreSQL remains running after the
+launcher exits and can be stopped with `docker compose down` (add `-v` only to delete local
+database data).
 
 ### Manual startup
 
@@ -107,17 +111,19 @@ npm ci
 npm run dev
 ```
 
-The web application calls the backend at `http://localhost:8080` by default. Override it before starting Next.js when needed:
+The web application reaches the backend through the Next.js `/api/**` rewrite, which targets
+`http://127.0.0.1:8080` by default. Override it before starting Next.js when the backend listens
+elsewhere:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run dev
+CONTEXTMESH_INTERNAL_API_ORIGIN=http://127.0.0.1:9090 npm run dev
 ```
 
 Development database defaults are `contextmesh` for database, user, and password on port `5432`. Override Compose with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`; configure the server with `DATABASE_URL`, `DATABASE_USER`, and `DATABASE_PASSWORD`. These defaults are local-only and are not production secrets.
 
 ### Verify the browser workflow
 
-The `dev` Spring profile enables the configurable development CORS policy described above (localhost by default, overridable with `CONTEXTMESH_DEV_ALLOWED_ORIGINS`) and `GET /api/v1/development/workspace`. The endpoint idempotently creates and returns the deterministic local development workspace; the browser calls it automatically. It is absent outside the `dev` profile.
+The `dev` Spring profile enables `GET /api/v1/development/workspace`. The endpoint idempotently creates and returns the deterministic local development workspace; the browser calls it automatically through the same-origin `/api` proxy. It is absent outside the `dev` profile.
 
 1. Open <http://localhost:3000>.
 2. Choose **Import ChatGPT JSON** and select a real `conversations.json` export (the browser sends its JSON contents, never its path).
@@ -126,7 +132,7 @@ The `dev` Spring profile enables the configurable development CORS policy descri
 5. In the new native conversation, use `fake` / `fake-model` for the built-in deterministic local provider, or `openai-compatible` and the server-configured model.
 6. Send a message and observe the incremental assistant response. Reopen or refresh the conversation to confirm PostgreSQL persistence.
 
-Provider API keys remain backend environment configuration and are never entered in or returned to the browser. The local bootstrap and CORS support are development-only; authentication and production workspace selection are intentionally deferred.
+Provider API keys remain backend environment configuration and are never entered in or returned to the browser. The local workspace bootstrap is development-only; authentication and production workspace selection are intentionally deferred.
 
 ## Checks
 

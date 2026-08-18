@@ -1,3 +1,0 @@
-contextmesh:
-  dev:
-    allowed-origins: ${CONTEXTMESH_DEV_ALLOWED_ORIGINS:http://localhost:3000}

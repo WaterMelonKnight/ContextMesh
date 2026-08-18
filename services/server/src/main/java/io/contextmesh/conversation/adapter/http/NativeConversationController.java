@@ -11,8 +11,10 @@ import io.contextmesh.conversation.domain.GenerationMetadata;
 import io.contextmesh.conversation.domain.MessageContentPart;
 import io.contextmesh.conversation.domain.MessageRole;
 import io.contextmesh.conversation.domain.TextContentPart;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -85,7 +87,11 @@ public final class NativeConversationController {
     @PostMapping(value = "/{conversationId}/turns", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter turn(@PathVariable UUID workspaceId, @PathVariable UUID conversationId,
-            @RequestBody TurnRequest request) {
+            @RequestBody TurnRequest request, HttpServletResponse response) {
+        // Browsers reach this stream through the Next.js /api rewrite and, in a cloud IDE, an HTTPS
+        // proxy. Without no-transform those intermediaries gzip the response and hold whole frames
+        // in the compressor, which turns incremental deltas into one burst at completion.
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
         if (request == null || request.content() == null || request.content().isEmpty())
             throw new IllegalArgumentException("content must not be empty");
         List<MessageContentPart> content = request.content().stream().map(part -> {

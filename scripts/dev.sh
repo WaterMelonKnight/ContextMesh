@@ -3,13 +3,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_ORIGIN="${CONTEXTMESH_PUBLIC_WEB_ORIGIN:-http://localhost:3000}"
-API_ORIGIN="${CONTEXTMESH_PUBLIC_API_ORIGIN:-http://localhost:8080}"
-
-if { [[ -n "${CONTEXTMESH_PUBLIC_WEB_ORIGIN:-}" ]] && [[ -z "${CONTEXTMESH_PUBLIC_API_ORIGIN:-}" ]]; } ||
-   { [[ -z "${CONTEXTMESH_PUBLIC_WEB_ORIGIN:-}" ]] && [[ -n "${CONTEXTMESH_PUBLIC_API_ORIGIN:-}" ]]; }; then
-  echo "error: CONTEXTMESH_PUBLIC_WEB_ORIGIN and CONTEXTMESH_PUBLIC_API_ORIGIN must be set together" >&2
-  exit 2
-fi
+INTERNAL_API_ORIGIN="${CONTEXTMESH_INTERNAL_API_ORIGIN:-http://127.0.0.1:8080}"
 
 validate_origin() {
   node -e '
@@ -21,19 +15,20 @@ validate_origin() {
 }
 
 validate_origin "$WEB_ORIGIN" "frontend URL"
-validate_origin "$API_ORIGIN" "backend URL"
+validate_origin "$INTERNAL_API_ORIGIN" "internal backend URL"
 WEB_ORIGIN="$(node -e 'process.stdout.write(new URL(process.argv[1]).origin)' "$WEB_ORIGIN")"
-API_ORIGIN="$(node -e 'process.stdout.write(new URL(process.argv[1]).origin)' "$API_ORIGIN")"
+INTERNAL_API_ORIGIN="$(node -e 'process.stdout.write(new URL(process.argv[1]).origin)' "$INTERNAL_API_ORIGIN")"
 DEV_ALLOWED_HOST="$(node -e 'process.stdout.write(new URL(process.argv[1]).host)' "$WEB_ORIGIN")"
 
 export SPRING_PROFILES_ACTIVE=dev
-export NEXT_PUBLIC_API_BASE_URL="$API_ORIGIN"
 export CONTEXTMESH_DEV_ALLOWED_ORIGIN_HOST="$DEV_ALLOWED_HOST"
-export CONTEXTMESH_DEV_ALLOWED_ORIGINS="$WEB_ORIGIN"
+# Server-side only: Next.js proxies same-origin /api/** here, so the browser needs no backend origin.
+export CONTEXTMESH_INTERNAL_API_ORIGIN="$INTERNAL_API_ORIGIN"
 
 echo "ContextMesh development startup"
-echo "  Frontend: $WEB_ORIGIN"
-echo "  Backend:  $API_ORIGIN"
+echo "  Frontend:         $WEB_ORIGIN"
+echo "  API path:         /api (same-origin, proxied by Next.js)"
+echo "  Internal backend: $INTERNAL_API_ORIGIN (not required to be reachable from the browser)"
 
 cd "$ROOT_DIR"
 docker compose up -d postgres

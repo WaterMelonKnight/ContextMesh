@@ -2,8 +2,10 @@ package io.contextmesh.conversation.adapter.http;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -27,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -244,7 +247,11 @@ class NativeConversationHttpIntegrationTest {
                                 {"provider":"fake","model":"fake-model",
                                  "content":[{"type":"TEXT","text":"Hello"}]}
                                 """))
-                .andExpect(status().isOk()).andReturn();
+                .andExpect(status().isOk())
+                // Keeps proxies (the Next.js /api rewrite, cloud IDE HTTPS proxies) from gzipping
+                // and thereby buffering the stream into a single burst.
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-transform")))
+                .andReturn();
         initial.getAsyncResult(5000);
         String body = mvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
