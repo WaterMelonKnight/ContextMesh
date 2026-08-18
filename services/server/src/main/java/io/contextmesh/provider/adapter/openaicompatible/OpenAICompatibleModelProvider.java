@@ -7,6 +7,8 @@ import io.contextmesh.provider.application.GenerationStream;
 import io.contextmesh.provider.application.ModelGenerationRequest;
 import io.contextmesh.provider.application.ModelMessage;
 import io.contextmesh.provider.application.ModelProvider;
+import io.contextmesh.provider.application.ProviderDescriptor;
+import io.contextmesh.provider.application.ProviderKind;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,6 +50,17 @@ public final class OpenAICompatibleModelProvider implements ModelProvider {
     }
 
     @Override public String providerId() { return PROVIDER_ID; }
+
+    /**
+     * The bean only exists when the endpoint is enabled and validly configured, so registration
+     * itself reports readiness. Only the optional model default is published; the base URL, API key,
+     * and default headers stay server-side.
+     */
+    @Override
+    public ProviderDescriptor describe() {
+        return new ProviderDescriptor(PROVIDER_ID, "OpenAI-compatible", ProviderKind.EXTERNAL,
+                properties.defaultModel());
+    }
 
     @Override
     public GenerationStream generate(ModelGenerationRequest request) {

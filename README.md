@@ -2,7 +2,7 @@
 
 ContextMesh converts AI conversations and future agent activity into **evolving, evidence-backed state**. It is not a general chat client: the product goal is to reconstruct topics, projects, decisions, and changes while preserving the path back to original evidence.
 
-> **Status — Local conversation MVP:** ChatGPT JSON import, immutable imported history, native continuations, and provider-neutral streaming chat are usable in the browser. Context graphs and extraction remain planned.
+> **Status — Local conversation MVP:** ChatGPT JSON import, immutable imported history, native continuations, and provider-neutral streaming chat against a server-configured model provider are usable in the browser. Context graphs and extraction remain planned.
 
 ## Implemented now
 
@@ -65,6 +65,64 @@ Set `CONTEXTMESH_INTERNAL_API_ORIGIN` only when Spring Boot does not listen on
 `http://127.0.0.1:8080`. It is read by `next.config.mjs` on the server, is never exposed to the
 browser, and must be a bare HTTP(S) origin without a path, query, fragment, or credentials.
 
+### Use a real model provider
+
+The built-in `fake` provider needs no configuration and never contacts a network:
+
+```bash
+./scripts/dev.sh
+```
+
+To make a real OpenAI-compatible endpoint selectable, configure it for the backend process. On
+localhost, `CONTEXTMESH_PUBLIC_WEB_ORIGIN` is not required:
+
+```bash
+CONTEXTMESH_OPENAI_ENABLED=true \
+CONTEXTMESH_OPENAI_BASE_URL=https://api.openai.com/v1 \
+CONTEXTMESH_OPENAI_API_KEY=… \
+./scripts/dev.sh
+```
+
+In a remote cloud IDE, add the public frontend origin:
+
+```bash
+CONTEXTMESH_OPENAI_ENABLED=true \
+CONTEXTMESH_OPENAI_BASE_URL=https://api.openai.com/v1 \
+CONTEXTMESH_OPENAI_API_KEY=… \
+CONTEXTMESH_PUBLIC_WEB_ORIGIN=https://workspace--3000.example-cloud-ide.com \
+./scripts/dev.sh
+```
+
+Optionally set `CONTEXTMESH_OPENAI_DEFAULT_MODEL` to prefill the composer's model field. Model
+identifiers are not credentials, so it is the only endpoint setting the browser ever sees.
+
+`GET /api/v1/providers` reports which providers the server registered. The composer's **Provider**
+control is a dropdown built from that response, so only a configured provider can be selected and
+an unconfigured one never appears. Enabling the adapter without a valid base URL and key fails at
+startup rather than presenting a provider that cannot answer. **Model** stays a text field:
+OpenAI-compatible endpoints expose different model identifiers and there is no universal discovery
+contract, so ContextMesh neither ships a model list nor guesses a model name.
+
+What this configuration is and is not:
+
+- A ChatGPT subscription is **not** OpenAI API access. API requests are billed against separate API
+  credentials from your provider's developer account; a ChatGPT Plus/Pro plan does not supply them.
+- Importing a ChatGPT export is entirely independent of provider configuration. Import and browse
+  history with no key configured.
+- Messages generated here are **not** written back into the original ChatGPT web conversation. The
+  API has no access to it, and the imported conversation stays immutable.
+- Every message you send from ContextMesh, and every completed assistant reply, is stored in
+  ContextMesh's own PostgreSQL database.
+
+The API key stays server-side. It is read only by the backend process, is never logged, never
+persisted to PostgreSQL, never returned by the provider status endpoint, and has no `NEXT_PUBLIC_`
+counterpart, so it cannot reach the browser bundle. Provider failures are reported to the UI as a
+fixed sentence with a stable code (`PROVIDER_AUTHENTICATION`, `PROVIDER_RATE_LIMIT`,
+`PROVIDER_UNAVAILABLE`, `PROVIDER_PROTOCOL`); upstream response bodies and headers are never
+forwarded.
+
+Endpoint configuration is trusted local-user/administrator configuration in this release.
+
 Turn generation stays incremental through the proxy: the backend serves `text/event-stream` with
 `Cache-Control: no-cache, no-transform`, which stops the Next.js rewrite and any cloud IDE HTTPS
 proxy from gzipping — and therefore buffering — the deltas into a single burst at completion.
@@ -97,11 +155,12 @@ provider credential is required while the adapter is disabled:
 export CONTEXTMESH_OPENAI_ENABLED=true
 export CONTEXTMESH_OPENAI_BASE_URL=http://localhost:11434/v1
 export CONTEXTMESH_OPENAI_API_KEY=replace-with-your-key
+export CONTEXTMESH_OPENAI_DEFAULT_MODEL=optional-model-id
 cd services/server && ./mvnw spring-boot:run
 ```
 
-The stable request provider ID is `openai-compatible`; each turn still selects its model. Endpoint
-configuration is trusted local-user/administrator configuration in this release.
+The stable request provider ID is `openai-compatible`; each turn still selects its model. See
+[Use a real model provider](#use-a-real-model-provider).
 
 Start the frontend in a third terminal:
 
@@ -129,7 +188,10 @@ The `dev` Spring profile enables `GET /api/v1/development/workspace`. The endpoi
 2. Choose **Import ChatGPT JSON** and select a real `conversations.json` export (the browser sends its JSON contents, never its path).
 3. Select the imported conversation and inspect its ordered messages.
 4. Choose **Continue full conversation** or **Continue from here** beside a message.
-5. In the new native conversation, use `fake` / `fake-model` for the built-in deterministic local provider, or `openai-compatible` and the server-configured model.
+5. In the new native conversation, pick a provider from the **Provider** dropdown. It lists only
+   providers the server has configured; `Fake (local, deterministic)` is always present and
+   `OpenAI-compatible` appears once it is enabled and configured. Enter a model identifier the
+   selected endpoint accepts.
 6. Send a message and observe the incremental assistant response. Reopen or refresh the conversation to confirm PostgreSQL persistence.
 
 Provider API keys remain backend environment configuration and are never entered in or returned to the browser. The local workspace bootstrap is development-only; authentication and production workspace selection are intentionally deferred.
@@ -138,7 +200,7 @@ Provider API keys remain backend environment configuration and are never entered
 
 ```bash
 cd services/server && ./mvnw verify
-cd apps/web && npm ci && npm run lint && npm run typecheck && npm run build && npm audit
+cd apps/web && npm ci && npm run lint && npm run typecheck && npm test && npm run build && npm audit
 ```
 
 ## Architecture and documentation

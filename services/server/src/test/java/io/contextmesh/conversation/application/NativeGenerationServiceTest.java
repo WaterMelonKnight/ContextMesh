@@ -15,6 +15,7 @@ import io.contextmesh.conversation.domain.TextContentPart;
 import io.contextmesh.provider.application.GenerationEvent;
 import io.contextmesh.provider.application.ModelGenerationRequest;
 import io.contextmesh.provider.application.ModelProvider;
+import io.contextmesh.provider.application.ModelProviderException;
 import io.contextmesh.provider.application.ModelProviderRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -175,6 +176,56 @@ class NativeGenerationServiceTest {
                 .isInstanceOf(ImportedConversationImmutableException.class);
         assertThatThrownBy(() -> service.generateTurn(workspace, conversation, "fake", "fake-model", List.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("content must not be empty");
+    }
+
+    @Test
+    void reportsProviderReasonWithoutAdapterDetailAndWithoutPersistingAssistant() {
+        var events = new ArrayList<GenerationEvent>();
+        var fixture = successfulFixture(failing(new TestProviderFailure(ModelProviderException.Reason.AUTHENTICATION,
+                "Bearer sk-live-secret was rejected by upstream")));
+
+        fixture.service().generateTurn(workspace, conversation, "fake", "fake-model",
+                List.of(new TextContentPart("Hello"))).consume(events::add);
+
+        assertThat(events).last().isEqualTo(
+                new GenerationEvent.Failed("PROVIDER_AUTHENTICATION", "Provider authentication failed."));
+        assertThat(events.toString()).doesNotContain("sk-live-secret");
+        verify(fixture.conversations(), org.mockito.Mockito.never()).appendMessage(eq(workspace), eq(conversation),
+                eq(MessageRole.ASSISTANT), any(), any());
+    }
+
+    @Test
+    void mapsEveryProviderReasonToAStableNonSecretCode() {
+        var codes = new ArrayList<String>();
+        for (var reason : ModelProviderException.Reason.values()) {
+            var events = new ArrayList<GenerationEvent>();
+            successfulFixture(failing(new TestProviderFailure(reason, "upstream detail")))
+                    .service().generateTurn(workspace, conversation, "fake", "fake-model",
+                            List.of(new TextContentPart("Hello"))).consume(events::add);
+            var failed = (GenerationEvent.Failed) events.getLast();
+            assertThat(failed.message()).doesNotContain("upstream detail").endsWith(".");
+            codes.add(failed.code());
+        }
+        assertThat(codes).containsExactly("PROVIDER_AUTHENTICATION", "PROVIDER_RATE_LIMIT",
+                "PROVIDER_UNAVAILABLE", "PROVIDER_PROTOCOL");
+    }
+
+    /** Any adapter's failure, without depending on one adapter's exception types. */
+    private static final class TestProviderFailure extends ModelProviderException {
+        private TestProviderFailure(Reason reason, String message) { super(reason, message); }
+    }
+
+    private ModelProvider failing(RuntimeException failure) {
+        return new ModelProvider() {
+            public String providerId() { return "fake"; }
+            public io.contextmesh.provider.application.GenerationStream generate(ModelGenerationRequest request) {
+                return sink -> {
+                    sink.accept(new GenerationEvent.Started("fake", request.model()));
+                    sink.accept(new GenerationEvent.TextDelta("partial"));
+                    throw failure;
+                };
+            }
+        };
     }
 
     private ModelProvider provider(AtomicReference<ModelGenerationRequest> captured, boolean fail) {

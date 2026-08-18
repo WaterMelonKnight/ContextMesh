@@ -48,12 +48,15 @@ class NativeConversationHttpIntegrationTest {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
     static final HttpServer upstream = startUpstream();
+    /** Request bodies the adapter actually put on the wire, so context assembly can be asserted. */
+    static final List<String> upstreamRequests = java.util.Collections.synchronizedList(new ArrayList<>());
 
     static HttpServer startUpstream() {
         try {
         var server = HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/chat/completions", exchange -> {
             var request = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            upstreamRequests.add(request);
             if (request.contains("failure-model")) {
                 exchange.sendResponseHeaders(500, -1);
                 exchange.close();
@@ -96,8 +99,10 @@ class NativeConversationHttpIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.update("delete from messages");
+        upstreamRequests.clear();
+        // Continuations reference a cutoff message, so they must go before messages.
         jdbc.update("delete from conversation_continuations");
+        jdbc.update("delete from messages");
         jdbc.update("delete from conversations");
         jdbc.update("delete from workspaces");
         jdbc.update("delete from users");
@@ -307,9 +312,90 @@ class NativeConversationHttpIntegrationTest {
         var body = mvc.perform(asyncDispatch(initial)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(body).contains("event:failed").contains("PROVIDER_FAILURE").doesNotContain("integration-secret");
+        assertThat(body).contains("event:failed").contains("PROVIDER_UNAVAILABLE")
+                .contains("Provider unavailable.").doesNotContain("integration-secret");
         assertThat(service.getConversation(workspaceId, id).messages())
                 .extracting(message -> message.role()).containsExactly(MessageRole.USER);
+    }
+
+    @Test
+    void publishesTheConfiguredProviderCatalogueWithoutTheApiKey() throws Exception {
+        var body = mvc.perform(get("/api/v1/providers")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='fake')].kind").value("BUILT_IN"))
+                .andExpect(jsonPath("$[?(@.id=='openai-compatible')].kind").value("EXTERNAL"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).doesNotContain("integration-secret").doesNotContain("Authorization")
+                .doesNotContain("127.0.0.1");
+    }
+
+    @Test
+    void sendsImportedContinuationContextToTheRealProviderInOrder() throws Exception {
+        mvc.perform(post("/api/v1/workspaces/" + workspaceId + "/imports/chatgpt")
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                        [{"id":"continued","title":"Continued","current_node":"a2","mapping":{
+                          "root":{"parent":null,"children":["s"],"message":null},
+                          "s":{"parent":"root","children":["u1"],"message":{"id":"s","author":{"role":"system"},
+                            "content":{"content_type":"text","parts":["Be helpful."]}}},
+                          "u1":{"parent":"s","children":["a1"],"message":{"id":"u1","author":{"role":"user"},
+                            "content":{"content_type":"text","parts":["Imported question"]}}},
+                          "a1":{"parent":"u1","children":["u2"],"message":{"id":"a1","author":{"role":"assistant"},
+                            "content":{"content_type":"text","parts":["Imported answer"]}}},
+                          "u2":{"parent":"a1","children":["a2"],"message":{"id":"u2","author":{"role":"user"},
+                            "content":{"content_type":"text","parts":["After the cutoff"]}}},
+                          "a2":{"parent":"u2","children":[],"message":{"id":"a2","author":{"role":"assistant"},
+                            "content":{"content_type":"text","parts":["Also after the cutoff"]}}}
+                        }}]
+                        """))
+                .andExpect(status().isOk());
+        UUID imported = UUID.fromString(objectMapper.readTree(mvc.perform(get(base()))
+                .andReturn().getResponse().getContentAsString()).get(0).path("id").asText());
+        var messages = objectMapper.readTree(mvc.perform(get(base() + "/" + imported))
+                .andReturn().getResponse().getContentAsString()).path("messages");
+        String cutoff = messages.get(2).path("id").asText();
+
+        var continuation = objectMapper.readTree(mvc.perform(post(base() + "/" + imported + "/continuations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"throughMessageId\":\"" + cutoff + "\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        UUID target = UUID.fromString(continuation.path("conversation").path("id").asText());
+
+        var initial = mvc.perform(post(base() + "/" + target + "/turns")
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {"provider":"openai-compatible","model":"compatible-model",
+                                 "content":[{"type":"TEXT","text":"Continue from that point."}]}
+                                """))
+                .andExpect(status().isOk()).andReturn();
+        initial.getAsyncResult(5000);
+        mvc.perform(asyncDispatch(initial)).andExpect(status().isOk());
+
+        // The real adapter must send the selected imported prefix, then native history, then the new
+        // user message — not just the latest message.
+        assertThat(upstreamRequests).hasSize(1);
+        var sent = objectMapper.readTree(upstreamRequests.getFirst()).path("messages");
+        assertThat(sent).hasSize(4);
+        assertThat(sent.findValuesAsText("content")).containsExactly("Be helpful.", "Imported question",
+                "Imported answer", "Continue from that point.");
+        assertThat(sent.findValuesAsText("role")).containsExactly("system", "user", "assistant", "user");
+        assertThat(upstreamRequests.getFirst()).doesNotContain("After the cutoff");
+
+        // A second turn keeps the imported prefix and adds the persisted native turn.
+        var second = mvc.perform(post(base() + "/" + target + "/turns")
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {"provider":"openai-compatible","model":"compatible-model",
+                                 "content":[{"type":"TEXT","text":"And then?"}]}
+                                """))
+                .andExpect(status().isOk()).andReturn();
+        second.getAsyncResult(5000);
+        mvc.perform(asyncDispatch(second)).andExpect(status().isOk());
+
+        assertThat(objectMapper.readTree(upstreamRequests.get(1)).path("messages").findValuesAsText("content"))
+                .containsExactly("Be helpful.", "Imported question", "Imported answer",
+                        "Continue from that point.", "Hello world", "And then?");
+        assertThat(jdbc.queryForObject("select count(*) from messages where conversation_id = ?",
+                Integer.class, imported)).isEqualTo(5);
     }
 
     private String base() { return "/api/v1/workspaces/" + workspaceId + "/conversations"; }
