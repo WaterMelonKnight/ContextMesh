@@ -18,5 +18,6 @@ contextmesh:
       enabled: ${CONTEXTMESH_OPENAI_ENABLED:false}
       base-url: ${CONTEXTMESH_OPENAI_BASE_URL:https://api.openai.com/v1}
       api-key: ${CONTEXTMESH_OPENAI_API_KEY:}
+      default-model: ${CONTEXTMESH_OPENAI_DEFAULT_MODEL:}
       connection-timeout: ${CONTEXTMESH_OPENAI_CONNECTION_TIMEOUT:10s}
       read-timeout: ${CONTEXTMESH_OPENAI_READ_TIMEOUT:2m}

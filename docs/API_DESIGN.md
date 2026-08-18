@@ -10,12 +10,41 @@ and the adapter sends `stream: true` to `POST {baseUrl}/chat/completions`.
 Provider SSE `delta.content` values are forwarded in order. Role, usage, finish metadata, and empty
 deltas are ignored. `[DONE]` is required for success: premature EOF, malformed JSON,
 timeout/connection errors, and HTTP failures do not become partial successes. Native Talk exposes a
-provider-neutral `PROVIDER_FAILURE` and never includes upstream bodies, headers, credentials, or
-stack traces. The USER remains and no ASSISTANT is stored on failure. On success the service stores
+provider-neutral failure reason — `PROVIDER_AUTHENTICATION`, `PROVIDER_RATE_LIMIT`,
+`PROVIDER_UNAVAILABLE`, or `PROVIDER_PROTOCOL`, with `PROVIDER_FAILURE` for any other provider
+error — and never includes upstream bodies, headers, credentials, or stack traces. Each code has a
+fixed sentence the UI can show; adapter exception messages are not forwarded. The USER remains and
+no ASSISTANT is stored on failure. On success the service stores
 one complete ASSISTANT with provider/model metadata and emits its message ID.
 
 Browser SSE disconnect is isolated from upstream execution, so generation and completed persistence
 continue. Explicit cancellation remains out of scope.
+
+## Model provider status
+
+### `GET /api/v1/providers`
+
+Returns the providers the server has registered, in identifier order:
+
+```json
+[
+  {"id": "fake", "displayName": "Fake (local, deterministic)", "kind": "BUILT_IN", "defaultModel": "fake-model"},
+  {"id": "openai-compatible", "displayName": "OpenAI-compatible", "kind": "EXTERNAL", "defaultModel": null}
+]
+```
+
+`id` is the value the turn endpoint accepts for `provider`. `kind` is `BUILT_IN` for deterministic
+in-process execution and `EXTERNAL` for a configured remote API, so a client can distinguish local
+execution from calls that leave the machine without hard-coding identifiers. `defaultModel` is an
+optional server-configured model identifier for prefilling; model identifiers are not credentials.
+
+Availability is registration: an adapter bean exists only when it is enabled and validly
+configured, so every listed provider can be selected, and an unconfigured provider is simply
+absent. The endpoint reports configuration readiness, never live endpoint health — it performs no
+upstream call and cannot be used to probe or amplify requests to a model API. The response is
+deliberately limited to these four fields; API keys, authorization headers, base URLs, and
+configured default headers are never returned. The path is not workspace-scoped because provider
+configuration is process-wide and identical for every workspace.
 
 ## Conventions
 

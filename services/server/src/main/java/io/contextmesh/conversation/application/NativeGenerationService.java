@@ -9,6 +9,7 @@ import io.contextmesh.provider.application.GenerationEvent;
 import io.contextmesh.provider.application.GenerationStream;
 import io.contextmesh.provider.application.ModelGenerationRequest;
 import io.contextmesh.provider.application.ModelMessage;
+import io.contextmesh.provider.application.ModelProviderException;
 import io.contextmesh.provider.application.ModelProviderRegistry;
 import java.util.List;
 import java.util.Objects;
@@ -82,7 +83,7 @@ public final class NativeGenerationService {
         } catch (RuntimeException exception) {
             if (state.terminal)
                 throw new InvalidGenerationStreamException("provider failed after a terminal event");
-            observer.notify(new GenerationEvent.Failed("PROVIDER_FAILURE", "Model generation failed"));
+            observer.notify(failure(exception));
             return;
         }
         if (!state.terminal) throw new InvalidGenerationStreamException("provider stream ended without a terminal event");
@@ -91,6 +92,25 @@ public final class NativeGenerationService {
                 List.of(new TextContentPart(state.text.toString())),
                 new GenerationMetadata(providerId, model));
         observer.notify(new GenerationEvent.Completed(providerId, model, assistant.id()));
+    }
+
+    /**
+     * Translates a failure into a stable code and a sentence a user can act on. Only the neutral
+     * reason is read: adapter messages, upstream bodies, headers, and credentials never reach the
+     * client, and no provider identity is branched on.
+     */
+    private GenerationEvent.Failed failure(RuntimeException exception) {
+        if (!(exception instanceof ModelProviderException provider))
+            return new GenerationEvent.Failed("PROVIDER_FAILURE", "Model generation failed");
+        return switch (provider.reason()) {
+            case AUTHENTICATION -> new GenerationEvent.Failed("PROVIDER_AUTHENTICATION",
+                    "Provider authentication failed.");
+            case RATE_LIMIT -> new GenerationEvent.Failed("PROVIDER_RATE_LIMIT",
+                    "Provider rate limit exceeded.");
+            case UNAVAILABLE -> new GenerationEvent.Failed("PROVIDER_UNAVAILABLE", "Provider unavailable.");
+            case PROTOCOL -> new GenerationEvent.Failed("PROVIDER_PROTOCOL",
+                    "Provider returned an invalid streaming response.");
+        };
     }
 
     private void acceptProviderEvent(GenerationEvent event, StreamState state, EventObserver observer,

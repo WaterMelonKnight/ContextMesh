@@ -1,5 +1,7 @@
 package io.contextmesh.provider.adapter.openaicompatible;
 
-public final class ProviderRateLimitException extends RuntimeException {
-    public ProviderRateLimitException() { super("Provider rate limit exceeded"); }
+import io.contextmesh.provider.application.ModelProviderException;
+
+public final class ProviderRateLimitException extends ModelProviderException {
+    public ProviderRateLimitException() { super(Reason.RATE_LIMIT, "Provider rate limit exceeded"); }
 }

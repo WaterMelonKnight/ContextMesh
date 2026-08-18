@@ -5,13 +5,19 @@ import java.time.Duration;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * Server-side endpoint configuration. {@code apiKey} and {@code defaultHeaders} are credentials or
+ * may carry them: they stay inside this adapter and are never exposed through an API or a log.
+ * {@code defaultModel} is optional and is a plain model identifier, not a credential.
+ */
 @ConfigurationProperties("contextmesh.providers.openai-compatible")
-public record OpenAICompatibleProviderProperties(boolean enabled, URI baseUrl, String apiKey,
+public record OpenAICompatibleProviderProperties(boolean enabled, URI baseUrl, String apiKey, String defaultModel,
         Duration connectionTimeout, Duration readTimeout, Map<String, String> defaultHeaders) {
     public OpenAICompatibleProviderProperties {
         connectionTimeout = connectionTimeout == null ? Duration.ofSeconds(10) : connectionTimeout;
         readTimeout = readTimeout == null ? Duration.ofMinutes(2) : readTimeout;
         defaultHeaders = defaultHeaders == null ? Map.of() : Map.copyOf(defaultHeaders);
+        defaultModel = defaultModel == null || defaultModel.isBlank() ? null : defaultModel.strip();
         if (enabled) validate(baseUrl, apiKey, connectionTimeout, readTimeout, defaultHeaders);
     }
 

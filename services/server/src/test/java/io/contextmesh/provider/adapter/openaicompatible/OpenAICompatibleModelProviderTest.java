@@ -113,7 +113,7 @@ class OpenAICompatibleModelProviderTest {
 
     @Test void enabledConfigurationRequiresCredentials() {
         assertThatThrownBy(() -> new OpenAICompatibleProviderProperties(true, URI.create("http://localhost/v1"),
-                "", Duration.ofSeconds(1), Duration.ofSeconds(1), Map.of()))
+                "", null, Duration.ofSeconds(1), Duration.ofSeconds(1), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("api-key");
     }
 
@@ -135,7 +135,7 @@ class OpenAICompatibleModelProviderTest {
     }
 
     private OpenAICompatibleProviderProperties properties(URI baseUrl) {
-        return new OpenAICompatibleProviderProperties(true, baseUrl, "test-secret",
+        return new OpenAICompatibleProviderProperties(true, baseUrl, "test-secret", null,
                 Duration.ofSeconds(2), Duration.ofSeconds(2), Map.of("X-Test", "value"));
     }
 

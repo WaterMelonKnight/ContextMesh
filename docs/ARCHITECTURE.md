@@ -20,6 +20,20 @@ HTTPS base URLs intentionally support local endpoints and trusted gateways.
 The provider bean joins the existing `ModelProviderRegistry` only when enabled. The application
 service does not branch on provider identity, and `FakeModelProvider` remains available.
 
+## Provider status and failure reasons
+
+`ModelProviderRegistry` is the single source of provider knowledge. Each adapter describes itself
+with a `ProviderDescriptor` (identifier, display name, `ProviderKind`, optional default model), and
+`GET /api/v1/providers` publishes exactly the registry's contents in identifier order. No other
+layer enumerates providers, so a new adapter appears in the browser by registering a bean. The
+descriptor deliberately has no component that could carry an API key, authorization header, base
+URL, or configured default header, and a test asserts that component list.
+
+Adapters raise `ModelProviderException` with a neutral `Reason` (`AUTHENTICATION`, `RATE_LIMIT`,
+`UNAVAILABLE`, `PROTOCOL`). `NativeGenerationService` maps the reason to a fixed code and sentence
+without reading the adapter's message or knowing which adapter failed, so upstream bodies and
+credentials cannot reach a client while the user still learns what went wrong.
+
 The current `TURN_GUARDS` are JVM-local hash-striped locks. They prevent overlapping turns for a
 conversation in one process, but cannot coordinate multiple instances and may serialize unrelated
 conversations sharing a stripe. Distributed coordination is intentionally deferred.
